@@ -1,0 +1,52 @@
+To add these parameters in a Jenkins job using the **"Add Parameters"** feature, you can follow these steps:
+
+### 1. Adding Platform Parameters:
+- **Dropdown 1 (OS Selection)**:
+  - Go to your Jenkins job, click on **"Configure"**.
+  - Scroll down to **"This project is parameterized"**, check the box.
+  - Click on **"Add Parameter"** and select **"Choice Parameter"**.
+  - For the **"Name"**, use something like `PLATFORM_OS`.
+  - In the **Choices** section, add the operating systems:  
+    ```
+    Windows
+    macOS
+    Android
+    ```
+
+- **Dropdown 2 (Version Selection)**:
+  - Click on **"Add Parameter"** again, and select **"Choice Parameter"**.
+  - For the **"Name"**, use something like `PLATFORM_VERSION`.
+  - In the **Choices** section, add the corresponding OS versions:
+    ```
+    Windows 10
+    Windows 11
+    macOS Big Sur
+    macOS Monterey
+    Android 11
+    Android 12
+    ```
+
+### 2. Adding Browser Parameters:
+- **Dropdown 1 (Browser Selection)**:
+  - Click on **"Add Parameter"** and select **"Choice Parameter"**.
+  - For the **"Name"**, use something like `BROWSER_TYPE`.
+  - In the **Choices** section, add the browsers:
+    ```
+    Chrome
+    Edge
+    Firefox
+    ```
+
+- **Dropdown 2 (Browser Version)**:
+  - Click on **"Add Parameter"** again, and select **"Choice Parameter"**.
+  - For the **"Name"**, use something like `BROWSER_VERSION`.
+  - In the **Choices** section, add the versions:
+    ```
+    121
+    122
+    latest
+    ```
+
+### Optional: Cascading Parameters
+If you want to have the second dropdown (version) dependent on the first dropdown (OS/Browser), Jenkins doesn’t support this natively. You can achieve cascading dropdowns with the **"Active Choices"** plugin, which allows dynamic parameters based on the selection of previous ones. This would require scripting within the parameter configuration.
+
