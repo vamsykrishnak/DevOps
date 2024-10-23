@@ -1,0 +1,76 @@
+pipeline {
+    agent any
+
+    stages {
+        stage('Check Java Version') {
+            steps {
+                script {
+                    // Checking Java version
+                    sh 'java -version'
+                }
+            }
+        }
+
+        stage('Check Maven Version') {
+            steps {
+                script {
+                    // Checking Maven version
+                    sh 'mvn -version'
+                }
+            }
+        }
+
+        stage('Check Gradle Version') {
+            steps {
+                script {
+                    // Checking Gradle version
+                    sh 'gradle -version'
+                }
+            }
+        }
+    }
+}
+
+
+----------------+
+pipeline {
+    agent any
+
+    stages {
+        stage('Check All Java Versions') {
+            steps {
+                script {
+                    // List all Java versions by looking for Java in common installation directories
+                    sh '''
+                    echo "Listing all installed Java versions:"
+                    update-alternatives --list java || echo "No alternatives found for Java"
+                    '''
+                }
+            }
+        }
+
+        stage('Check All Maven Versions') {
+            steps {
+                script {
+                    // Find all installed Maven versions
+                    sh '''
+                    echo "Listing all installed Maven versions:"
+                    whereis mvn || echo "Maven not found"
+                    '''
+                }
+            }
+        }
+
+        stage('Check All Gradle Versions') {
+            steps {
+                script {
+                    // Find all installed Gradle versions
+                    sh '''
+                    echo "Listing all installed Gradle versions:"
+                    whereis gradle || echo "Gradle not found"
+                    '''
+                }
+            }
+        }
+    }
+}
