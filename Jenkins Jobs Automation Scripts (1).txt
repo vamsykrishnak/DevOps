@@ -1,0 +1,3106 @@
+https://jenkins-connected-exp.proterra.com:8443/view/DEVOPS/job/DEVOPS-REPO-LIST-PREPARATION-FOR-SCANS-MULTIPLE-BRANCHES/configure
+
+#cat /var/lib/jenkins/jobs/DEVOPS/Valence_Developers_Repo.list
+array=$(awk -F= '{print $1}' /var/lib/jenkins/jobs/DEVOPS/Valence_Developers_Repo.list)
+branches=$(awk -F= '{print $1}' /var/lib/jenkins/jobs/DEVOPS/Valence_Developers_Branch_List_For_Scan.list)
+
+
+#cleaning previous files if exist for same day
+if [ -f "$WORKSPACE/Valence_Developers_Latest_Commits_Repo_List_$(date +%F)_$branch_name.list" ]; then
+    sudo rm -rf $WORKSPACE/Valence_Developers_Latest_Commits_Repo_List_$(date +%F)_$branch_name.list
+fi
+if [ -d "$WORKSPACE/gitrepos_$(date +%F)" ]; then
+    sudo rm -rf $WORKSPACE/gitrepos_$(date +%F)
+fi
+mkdir -p $WORKSPACE/gitrepos_$(date +%F) && cd $WORKSPACE/gitrepos_$(date +%F)
+for element in ${array}
+do
+  echo "clonning ${element}"
+  git clone git@github.com:proterra-inc/$element.git
+  cd $WORKSPACE/gitrepos_$(date +%F)/$element
+  
+  
+  for branch_name in ${branches}
+	do  
+             
+  		git checkout $branch_name
+  		commit_exists=`git log --since="1 day ago"`
+        	if [ -n "$commit_exists" ]; then 
+           	echo "${element}" >> $WORKSPACE/Valence_Developers_Latest_Commits_Repo_List_$(date +%F)_$branch_name.list
+ 			fi	
+      done
+ cd $WORKSPACE/gitrepos_$(date +%F)
+done
+-----------------------------------------------------------------------------------------------------------------------------------------
+https://jenkins-connected-exp.proterra.com:8443/view/DEVOPS/job/DEVOPS-SCA-REPORT-RUN-ON-DEMAND-MULTIPLE-BRANCHES/configure
+
+pipeline {
+	agent any
+	stages {
+	    
+		stage('Hello') {
+			steps {
+				script{
+				
+				
+				
+				    branch_file= "/var/lib/jenkins/jobs/DEVOPS/Valence_Developers_Branch_List_For_Scan.list"
+                    def branchfilePath = readFile "${branch_file}"
+                    def branches = branchfilePath.readLines()
+                        for (branch_name in branches) {  
+                        	println "Running SCA for ${branch_name}"  
+							
+														//	echo "Date is $date"
+							def now = new Date()
+							today_date=now.format("yyyy-MM-dd", TimeZone.getTimeZone('UTC'))
+							//println "Today is ${today_date}"
+							
+							
+							def exists = fileExists "/var/lib/jenkins/workspace/DEVOPS-REPO-LIST-PREPARATION-FOR-SCANS-MULTIPLE-BRANCHES/Valence_Developers_Latest_Commits_Repo_List_" + today_date + "_" + branch_name + ".list"
+							
+							if (exists) {
+							
+								//To read file from workspace which will contain the Jenkins Job Name ###
+								sh "rm -rf /var/lib/jenkins/jobs/DEVOPS-SCA-REPORT-RUN-ON-DEMAND-MULTIPLE-BRANCHES/*.html"
+								sh "rm -rf /var/lib/jenkins/jobs/DEVOPS-SCA-REPORT-RUN-ON-DEMAND-MULTIPLE-BRANCHES/*.zip"
+								
+
+							
+							read_file= "/var/lib/jenkins/workspace/DEVOPS-REPO-LIST-PREPARATION-FOR-SCANS-MULTIPLE-BRANCHES/Valence_Developers_Latest_Commits_Repo_List_" + today_date + "_" + branch_name + ".list"                 
+							
+							
+							
+							
+							
+				    
+					
+                
+                //   read_file= "/var/lib/jenkins/jobs/DEVOPS/Valence_Developers_Latest_Commits_Repo_List_" + today_date + ".list"
+                 //read_file= "/var/lib/jenkins/jobs/DEVOPS/test.list"
+                    
+                    
+					def filePath = readFile "${read_file}"
+
+					//To read file line by line ###
+					def lines = filePath.readLines() 
+		  
+						//To iterate and run Jenkins Jobs one by one ####
+						for (line in lines) {    
+								//println "${line}"
+								
+								
+                                 stage('SCM') {
+                                     cleanWs()
+                                  git branch: "$branch_name", credentialsId: 'spandanapotnuru', url: "git@github.com:proterra-inc/${line}.git"
+                                  }				            
+	 
+								stage('SCA') {
+									
+										  echo "Repository is ${line}"  
+
+                    												 if ((line == 'MDC-EMM-UI') || (line == 'ccss-ecms-ui') || (line == 'commissioning') || (line == 'multiplexer_cp_ui')){
+										  
+										      catchError {
+                    										    sh 'rm ./package-lock.json'
+                    										  
+                    										    
+                    											dependencyCheck additionalArguments: ' --format HTML', odcInstallation: 'Default'
+           
+                                                                sh "mv dependency-check-report.html /var/lib/jenkins/jobs/DEVOPS-SCA-REPORT-RUN-ON-DEMAND-MULTIPLE-BRANCHES/DEVOPS-${line}-${branch_name}-dependency-check-report.html"
+                    													 
+                    									}
+										  }
+										  else if ((line == 'Userinterface')){
+										      
+										      
+
+                    										catchError {
+                    										    sh 'rm -rf ./assetmgmt-ui/package-lock.json ./charger_commisioning/package-lock.json /var/lib/jenkins/workspace/DEVOPS-SCA-REPORT-RUN-ON-DEMAND-MULTIPLE-BRANCHES/assetmgmt-ui/package-lock.json'
+                    										   
+                    										  //sh 'rm ./**/package-lock.json'
+                    											dependencyCheck additionalArguments: ' --format HTML', odcInstallation: 'Default'
+                    										    
+                    											/*dependencyCheck additionalArguments: ' --format HTML', odcInstallation: 'Default' */
+           
+                                                                sh "mv dependency-check-report.html /var/lib/jenkins/jobs/DEVOPS-SCA-REPORT-RUN-ON-DEMAND-MULTIPLE-BRANCHES/DEVOPS-${line}-${branch_name}-dependency-check-report.html"
+                    													 
+                    									}
+										  }
+										  else{
+										      
+										       catchError {
+                    										    
+                    										 
+                    										    
+                    											dependencyCheck additionalArguments: ' --format HTML', odcInstallation: 'Default'
+           
+                                                                sh "mv dependency-check-report.html /var/lib/jenkins/jobs/DEVOPS-SCA-REPORT-RUN-ON-DEMAND-MULTIPLE-BRANCHES/DEVOPS-${line}-${branch_name}-dependency-check-report.html"
+                    													 
+                    									}
+										  }
+														
+                    								
+                                        
+								}	
+								
+							stage ('Zip') {
+		 sh "zip /var/lib/jenkins/jobs/DEVOPS-SCA-REPORT-RUN-ON-DEMAND-MULTIPLE-BRANCHES/SCA_REPORTS_${today_date}_${branch_name}.zip /var/lib/jenkins/jobs/DEVOPS-SCA-REPORT-RUN-ON-DEMAND-MULTIPLE-BRANCHES/DEVOPS-${line}-${branch_name}-dependency-check-report.html"
+}	
+							
+						}  
+						
+						
+    stage('Attch File') {
+sh '''
+export newd="$(date +'%m%d%y')"
+
+rm -rf *.zip
+
+cp /var/lib/jenkins/jobs/DEVOPS-SCA-REPORT-RUN-ON-DEMAND-MULTIPLE-BRANCHES/SCA_REPORTS_*.zip .
+
+'''
+
+
+}
+                        stage ('Email-Notification') {
+                    //	archiveArtifacts artifacts: '*.txt', onlyIfSuccessful: true
+                    	emailext to: "$postbuild_email_address",
+                    //	emailext to: "spotnuru@proterra.com",
+                    	subject: "SCA Report for ${branch_name} Generated-${BUILD_TIMESTAMP}",
+                    	body: """
+Hi Team,
+	   
+SCA analysis is done on branch  "$branch_name".SCA report runs on a daily basis for specific branches configured where there are commits.
+Results are avaialble in attached zip file.
+Today's scan is completed on repo's 
+${filePath}
+
+Regards
+DevOps Team
+                    		 """,
+                    		 attachmentsPattern: "*${branch_name}*.zip"
+
+                            }
+
+
+
+}
+
+
+
+
+
+else {
+
+                        stage ('Email-Notification') {
+                    //	archiveArtifacts artifacts: '*.txt', onlyIfSuccessful: true
+                    	emailext to: "$postbuild_email_address",
+                    //	emailext to: "spotnuru@proterra.com",
+                    	subject: "No recent commits to generate SCA Report on ${branch_name} at ${BUILD_TIMESTAMP}",
+                    	body: """
+Hi Team,
+	   
+	   
+No recent commits done on branch "$branch_name". SCA report runs on a daily basis for specific branches configured where there are commits.
+
+Regards
+DevOps Team
+                    		 """
+                    		// attachmentsPattern: '*.zip'
+
+                            }
+							
+						
+						
+                
+                    
+			}
+			
+			
+			
+				
+		}
+    }
+}
+}
+}
+}
+
+----------------------------------------------------------------------------------------------------------------
+https://jenkins-connected-exp.proterra.com:8443/view/DEVOPS/job/DEVOPS-SAST-REPORT-RUN-ON-DEMAND-MULTIPLE-BRANCHES/configure
+
+pipeline {
+    agent any
+
+    stages {
+        stage('Hello') {
+            steps {
+                	script{
+                    branch_file= "/var/lib/jenkins/jobs/DEVOPS/Valence_Developers_Branch_List_For_Scan.list"
+                    def branchfilePath = readFile "${branch_file}"
+                    def branches = branchfilePath.readLines()
+                        for (branch_name in branches) {  
+                        	println "Running SAST for ${branch_name}"                    	
+                        	sh "date=`date +%F`"
+							def now = new Date()
+							today_date=now.format("yyyy-MM-dd", TimeZone.getTimeZone('UTC'))  
+							def exists = fileExists "/var/lib/jenkins/workspace/DEVOPS-REPO-LIST-PREPARATION-FOR-SCANS-MULTIPLE-BRANCHES/Valence_Developers_Latest_Commits_Repo_List_" + today_date + "_" + branch_name + ".list"
+
+                            if (exists) {
+                                
+							read_file= "/var/lib/jenkins/workspace/DEVOPS-REPO-LIST-PREPARATION-FOR-SCANS-MULTIPLE-BRANCHES/Valence_Developers_Latest_Commits_Repo_List_" + today_date + "_" + branch_name + ".list"                 
+                    		def filePath = readFile "${read_file}"			
+							def lines = filePath.readLines() 
+		  
+							
+							
+							
+							for (line in lines) {
+                                 stage('SCM') {
+                                     cleanWs()
+                                      def jdk = tool name: 'java11'
+                                  env.JAVA_HOME = "${jdk}"
+                                  git branch: "$branch_name", credentialsId: 'spandanapotnuru', url: "git@github.com:proterra-inc/${line}.git"
+                                  }				            
+	 
+								stage('SonarQube analysis') {									
+										  echo "Repository is ${line}"  
+										    if ((line == 'dlms-device-service') || (line == 'valence-alerts') || (line == 'reporting-service') || (line =='dlms-certificate-service')  ||  (line =='activity-log-manager') ||  (line =='valence-alerts') ||  (line =='apex_business_tier') ||  (line =='bus-monitor') ||  (line =='ccss-ecms-ui') ||  (line =='ccss-manager') ||  (line =='chargemgmt') ||  (line =='customer-cloud-integration') ||  (line =='dnp3') ||  (line =='fault-dashboard-service') ||  (line =='incoming-queue') ||  (line =='multiplexer') ||  (line =='multiplexer-control-panel') ||  (line =='multiplexer_cp_ui') ||  (line =='reporting-service') ||  (line =='sse-event-service') ||  (line =='v2g-backend') ||  (line =='v2g-webservices') ||  (line =='vehicle-fault-processor')  ||  (line =='admin-service') ||  (line =='alerts-config-service') ||  (line =='apex-esupgrade-lib') ||  (line =='apex-rule-engine') ||  (line =='charger-fault-processor') ||  (line =='fault-lib') ||  (line =='notifications') ||  (line =='openadr-adapter') ||  (line =='scmt-cloner') ||  (line =='vehicle_mender_updates') ||  (line =='elastic-search-util') ||  (line =='rbac-lib')) {
+                                                        def scannerHome = tool 'SonarQube';
+                    									withSonarQubeEnv(branch: "$branch_name",credentialsId: 'devopsdemo'){ 
+                    										catchError {
+                    											sh "${scannerHome}/bin/sonar-scanner \
+                    											-D sonar.projectKey=DEVOPS-${line}-${branch_name} \
+                    											-D sonar.java.source=11 \
+                    											-D sonar.java.binaries=src/main \
+                    											-D sonar.host.url=https://sonarqube-cicd.proterra.com"
+                    													 
+                    									}
+                    								}
+                                            }  
+                                            else if ((line == 'insights')|| (line == 'Proterra-OCPP4') || (line == 'apex-datasystem-headers') || (line == 'apex-tabs') || (line =='charger-fault-api')  ||  (line =='Charger-Simulator')  ||  (line =='commissioning') ||  (line =='Userinterface') ||  (line =='valence_utilities') )  {
+                                                		def scannerHome = tool 'SonarQube';
+                    									withSonarQubeEnv(branch: "$branch_name",credentialsId: 'devopsdemo'){ 
+                    										catchError {
+                    											sh "${scannerHome}/bin/sonar-scanner \
+                    											-D sonar.projectKey=DEVOPS-${line}-${branch_name} \
+                    											-D sonar.java.source=11 \
+                    											-D sonar.java.binaries=* \
+                    											-D sonar.host.url=https://sonarqube-cicd.proterra.com"
+													 
+									}
+								}
+                                                
+                                                
+                                            }
+                                            
+                                            
+                                            
+                                            else {
+                                                		def scannerHome = tool 'SonarQube';
+                    									withSonarQubeEnv(branch: "$branch_name",credentialsId: 'devopsdemo'){ 
+                    										catchError {
+                    											sh "${scannerHome}/bin/sonar-scanner \
+                    											-D sonar.projectKey=DEVOPS-${line}-${branch_name} \
+                    											-D sonar.java.source=11 \
+                    											-D sonar.java.binaries=*/src/main \
+                    											-D sonar.host.url=https://sonarqube-cicd.proterra.com"
+													 
+									}
+								}
+                                                
+                                                
+                                            }
+										 
+								}	
+						} 
+						
+					//	if ( -f "/var/lib/jenkins/workspace/DEVOPS-REPO-LIST-PREPARATION-FOR-SCANS-MULTIPLE-BRANCHES/Valence_Developers_Latest_Commits_Repo_List_$(date +%F)_"+ branch_name + ".list" )
+					//	{
+
+
+						stage ('Email-Notification') {
+						    emailext to: "$postbuild_email_address",
+                    	//emailext to: "spotnuru@proterra.com",
+                    	subject: "SAST Report for ${branch_name} Generated-${BUILD_TIMESTAMP}",
+                    	body: """
+Hi Team,
+	   
+Sonarqube analysis is done on branch  "$branch_name".SAST report runs on a daily basis for specific branches configured where there are commits.
+Results are avaialble in Sonardashboard (https://sonarqube-cicd.proterra.com/) with naming convention DEVOPS-<RepoName>-<BranchName>.
+Today's scan is completed on repo's 
+${filePath}
+
+Regards
+DevOps Team
+                    		 """
+                    		//,attachmentsPattern: '*.txt'
+
+                           } 
+                            
+						}
+                            
+                        else {
+    
+                        stage ('Email-Notification') {
+                            emailext to: "$postbuild_email_address",
+                    	//emailext to: "spotnuru@proterra.com",
+                    	subject: "No recent commits to generate SAST Report on ${branch_name} at ${BUILD_TIMESTAMP}",
+                    	body: """
+Hi Team,
+	   
+No recent commits done on branch "$branch_name". SAST report runs on a daily basis for specific branches configured where there are commits.
+
+
+Regards
+DevOps Team
+                    		 """
+                    		//,attachmentsPattern: '*.txt'
+
+                           } 
+                            
+                            
+                            
+                            
+                        }    
+                            
+                            
+                            
+                        	
+                                             
+                            
+                            
+                        }
+               
+                }
+            }
+        }
+    }
+}
+
+----------------------------------------------------------------------------------------------------------------
+https://jenkins-connected-exp.proterra.com:8443/view/DEVOPS/job/tagging_pipeline/configure
+
+pipeline {
+    agent any
+    
+    parameters {
+        //string(name: 'REPO_LIST', defaultValue: 'dnp3\nactivity-log-manager', description: 'List of GitHub repositories (one per line)', multiLine: true)
+        //string(name: 'REPO_LIST', defaultValue: '', description: 'List of GitHub repositories (one per line)')
+        string(name: 'TAG_NAME', defaultValue: 'SNAPSHOT-dev-r37-20240312', description: 'Tag name to create(for ex: SNAPSHOT-<branch_name>-<currentdate>)')
+        string(name: 'BRANCH_NAME', defaultValue: 'dev-r37', description: 'Provide branch name')
+        //multi-string(name: 'BRANCH_NAME', defaultValue: 'dev-r37', description: 'Provide branch name')
+    }
+    
+    stages {
+        stage('Checkout and Tag') {
+            steps {
+                script {
+                    // Split the multi-line string into an array of repository URLs
+                    def repoList = params.REPO_LIST.tokenize('\n')
+                    
+                    // Iterate over each repository URL
+                    repoList.each { repoUrl ->
+                        // Clone the repository
+                        //git credentialsId: 'your-credentials-id', url: repoUrl
+                        git branch: "${params.BRANCH_NAME}", credentialsId: 'connected_github', url: "git@github.com:proterra-inc/${repoUrl}.git"
+                        
+                        // Tag the code
+                        sh "git tag ${params.TAG_NAME}"
+                        sh "git push origin ${params.TAG_NAME}"
+                        sh "git tag -d ${params.TAG_NAME}"
+
+                    }
+                }
+            }
+        }
+    }
+}
+
+----------------------------------------------------------------------------------------------------------------
+https://jenkins-connected-exp.proterra.com:8443/view/DEVOPS/job/clone-apigateway-repo/56/replay/
+
+pipeline 
+{
+    agent any
+    
+    stages 
+    {
+    
+        stage('Clone apigatewayrepo') {
+        
+        steps {
+            script {
+                
+                echo "cloned apigatewayrepo"
+            }
+        }
+        }
+        
+        stage('Convert CSV to Tab-Delimited') {
+            steps {
+                script {
+                    // Define paths for input and output files
+                    def inputFile = 'Swaggers/testdir/apigatewaytestfilewithapiid.csv'
+                    def outputFile = 'Swaggers/testdir/output.properties'
+                    def inputFile_new = 'Swaggers/testdir/swaggersdeployinputfile.csv'
+                    def outputFile_new = 'Swaggers/testdir/output_new.properties'
+
+                    // Read the content of the input CSV file
+                    def csvContent = readFile(file: inputFile).trim()
+                    def csvContent_new = readFile(file: inputFile_new).trim()
+
+                    // Replace commas with tabs to convert to tab-delimited
+                    def tabDelimitedContent = csvContent.replaceAll(',', '\t')
+                    def tabDelimitedContent_new = csvContent_new.replaceAll(',', '\t')
+
+                    // Write the tab-delimited content to the output file
+                    writeFile(file: outputFile, text: tabDelimitedContent)
+                    writeFile(file: outputFile_new, text: tabDelimitedContent_new)
+                }
+            }
+        }
+    }
+}
+
+----------------------------------------------------------------------------------------------------------------
+
+https://jenkins-connected-exp.proterra.com:8443/view/DEVOPS/job/all-env-apigateway-swaggers-deployment/configure
+
+pipeline 
+{
+    agent any
+    
+    parameters 
+    {
+        //choice(name: 'DEPLOY_API', choices: ['true', 'false'], description: 'Deploy API after importing Swagger file?')
+        choice(name: 'action', choices: 'import&deploy\ncreatenewapigateway', description: 'Choose import&deploy/create')
+        choice(name: 'environment', choices: 'dev_launch\nqa_launch', description: 'choose environment')
+        string(name: 'AWS_REGION', description: " AWS_REGION", defaultValue: 'us-east-1')
+        //string(name: 'API_STAGE', description: "API_STAGE", defaultValue: 'exp-dev')
+        //string(name: 'API_ID', description: "API_ID", defaultValue: 'cwot8inuq1')
+        string(name: 'S3_BUCKET', description: "S3_BUCKET", defaultValue: 'exp-dev-foundation')
+        //choice(name: 'env_swagger_file', choices: 'dev-launch\nqa_launch\nprod1\nprod2\nDevlaunch-Docusign-Jenkins-testing.yaml', description: 'Choose env swagger file to deploy')
+        //string(name: 'S3_SWAGGER_FILE_NAME', description: "S3_SWAGGER_FILE_NAME", defaultValue: 'DASH_DATALAKE.json')
+        
+    }
+    
+    environment 
+    {
+        /*AWS_REGION = 'us-east-1'
+        S3_BUCKET = 'exp-dev-foundation'
+        API_ID = 'cwot8inuq1'
+        API_STAGE = 'exp-dev'
+        GITHUB_REPO = 'git@github.com:proterra-inc/apigateway.git'
+        GITHUB_FILE_PATH = 'path/to/swagger.yaml'*/
+        //S3_SWAGGER_FILE_NAME = 'DASH_DATALAKE.json'
+        S3_SWAGGER_FILE_NAME = 'sample_swagger_file.json'
+        //SWAGGER_FILE="/var/lib/jenkins/Devlaunch-Docusign-Jenkins-testing.yaml"
+    }
+    
+    stages {
+        stage('Read CSV file') {
+            steps {
+                script {
+                    git branch: 'master', credentialsId: 'connected_github', url: 'git@github.com:proterra-inc/apigateway.git'
+                    
+                    //def csvFile = 'Swaggers/testfaultdashboard/swaggersdeployinputfile.csv'
+
+                }
+            }
+        }
+        
+        stage('Convert CSV to Tab-Delimited') {
+            steps {
+                script {
+                    // Define paths for input and output files
+                    def inputFile = 'Swaggers/testfaultdashboard/swaggersdeployinputfile.csv'
+                    def outputFile = 'Swaggers/testfaultdashboard/output1.properties'
+                    //def inputFile_new = 'Swaggers/testdir/swaggersdeployinputfile.csv'
+                    //def outputFile_new = 'Swaggers/testdir/output_new.properties'
+
+                    // Read the content of the input CSV file
+                    def csvContent = readFile(file: inputFile).trim()
+                    //def csvContent_new = readFile(file: inputFile_new).trim()
+
+                    // Replace commas with tabs to convert to tab-delimited
+                    def tabDelimitedContent = csvContent.replaceAll(',', '\t')
+                    //def tabDelimitedContent_new = csvContent_new.replaceAll(',', '\t')
+
+                    // Write the tab-delimited content to the output file
+                    writeFile(file: outputFile, text: tabDelimitedContent)
+                   // writeFile(file: outputFile_new, text: tabDelimitedContent_new)
+                   
+                    echo "environment: ${params.environment}"
+                    
+                    def keyvaluepair = sh(script: "cat Swaggers/testfaultdashboard/output1.properties | grep ${params.environment}", returnStdout: true).trim()
+                    
+                    //String keyvaluepair= sh "cat /var/lib/jenkins/workspace/devlaunch-apigateway-swaggers-deploy-test/Swaggers/testdir/testfile.properties | grep ${params.APIGATEWAYNAMEAPIID}"
+                    echo "APIGATEWAYNAME: ${keyvaluepair}"
+                    
+                    
+                    // Splitting the string by tab
+                    def splitValues = keyvaluepair.split('\t')
+    
+                    // Printing each split value
+                    splitValues.each { value ->
+                        println "Split value: $value"
+                    }
+                    
+                    env.environment= splitValues[0]
+                    env.api_stage= splitValues[1]
+                    env.host= splitValues[2]
+                    env.base_path= splitValues[3]
+                    env.title= splitValues[4]
+                    env.cognito_arn= splitValues[5]
+                    env.apiid= splitValues[6]
+                    
+                    println "environment: ${env.environment}"
+                    println "api_stage: ${env.api_stage}"
+                    println "host: ${env.host}"
+                    println "base_path: ${env.base_path}"
+                    println "title: ${env.title}"
+                    println "cognito_arn: ${env.cognito_arn}"
+                    println "apiid: ${env.apiid}"
+                }
+            }
+        }
+
+
+
+        stage('Export Swagger file to S3') {
+            when { expression {  params.action == 'import&deploy' } }
+            steps {
+                script {
+                    //sh "aws apigateway get-export --rest-api-id ${params.API_ID} --stage-name ${params.API_STAGE} --export-type swagger --accepts application/json $S3_SWAGGER_FILE_NAME"
+                    sh "aws apigateway get-export --rest-api-id ${env.apiid} --stage-name ${env.api_stage} --export-type swagger --accepts application/json $S3_SWAGGER_FILE_NAME"
+                    
+                    println "Swagger file to be exported into S3 bucket before versioning: ${S3_SWAGGER_FILE_NAME}"
+                    
+                    // Get the current date and time
+                    //def currentDate = new Date()
+                    // Define the date format you want
+                    //def dateFormat = new SimpleDateFormat("yyyyMMdd_HHmmss")
+                    // Format the date and time
+                    //def formattedDate = dateFormat.format(currentDate)
+                    
+                    //println new Date().format.('yyyyMMddHH:mm:ss')
+                    
+                    //def formattedDate = new Date().format.('yyyyMMddHH:mm:ss')
+                    
+                    // Rename or version your YAML file
+                    //def originalFileName = "original.yaml"
+                    //def versionedFileName = "original_${formattedDate}.yaml"
+                    
+                    // Renaming the file
+                   // sh "mv ${originalFileName} ${versionedFileName}"
+                    
+                    //println new Date().format.('yyyyMMddHH:mm:ss')
+                    
+                    //println "Swagger file to be exported into S3 bucket after versioning: ${versionedFileName}"
+                    
+                    def formattedDate = sh(returnStdout: true, script: 'date +%Y-%m-%d_%H-%M-%S').trim()
+                    println "Formatted date: ${formattedDate}"
+                    
+                    // Rename or version your YAML file
+                    def originalSwaggerFile = "${S3_SWAGGER_FILE_NAME}"
+                    def versionedSwaggerFile = "${env.apiid}_${formattedDate}.json"
+                    
+                    // Renaming the file
+                    sh "cp ${originalSwaggerFile} ${versionedSwaggerFile}"
+                    
+                    println "Swagger file to be exported into S3 bucket after versioning: ${versionedSwaggerFile}"
+                    
+                    sh "aws s3 cp ${versionedSwaggerFile} s3://${params.S3_BUCKET}/${versionedSwaggerFile}"
+                }
+            }
+        }
+
+
+        
+        stage('Import Swagger file from GitHub') {
+            when { expression {  params.action == 'import&deploy' } }
+            steps {
+                script {
+                    
+                    //sh "curl -o $SWAGGER_FILE_NAME $GITHUB_REPO/$GITHUB_FILE_PATH"
+                    ///var/lib/jenkins/Devlaunch-Docusign-Jenkins-testing.yaml
+                    //SWAGGER_FILE="Swaggers/DASH/${params.env_swagger_file}.json"
+                    //SWAGGER_FILE="${env.FolderName}/${env.ServiceName}/${env.Environment}.json"
+                    env.SWAGGER_FILE="Swaggers/testfaultdashboard/swagger.json"
+                    println "Swagger file to be deployed: ${SWAGGER_FILE}"
+                }
+            }
+        }
+
+        stage('Update Swagger JSON') {
+            steps {
+                script {
+                    def swaggerContent = readFile(file: env.SWAGGER_FILE).trim()
+
+                    // Replace variables in Swagger JSON
+                    swaggerContent = swaggerContent.replace('<<HOST>>', env.host)
+                    swaggerContent = swaggerContent.replace('<<BASE_PATH>>', env.base_path)
+                    swaggerContent = swaggerContent.replace('<<TITLE>>', env.title)
+                    swaggerContent = swaggerContent.replace('<<COGNITO_ARN>>', env.cognito_arn)
+
+                    writeFile(file: env.SWAGGER_FILE, text: swaggerContent)
+                    
+                    sh"cat ${env.SWAGGER_FILE}"
+                }
+            }
+        }
+        
+        stage('Deploy API Gateway') {
+            when { expression {  params.action == 'import&deploy' } }
+            steps {
+                script {
+                    sh "aws apigateway put-rest-api --rest-api-id ${env.apiid} --mode merge --region ${params.AWS_REGION} --body fileb://${env.SWAGGER_FILE}"
+                    def deployment_id = sh(script: "aws apigateway create-deployment --rest-api-id ${env.apiid} --stage-name ${env.api_stage} --region ${params.AWS_REGION} --query 'id' --output text", returnStdout: true).trim()
+                    echo "Deployment_ID: $deployment_id"
+                }
+            }
+        }
+        
+        
+    }
+}
+
+----------------------------------------------------------------------------------------------------------------
+https://jenkins-connected-exp.proterra.com:8443/view/DEVOPS/job/devlaunch-apigateway-swaggers-deploy-test/configure
+
+pipeline 
+{
+    agent any
+    
+    parameters 
+    {
+        //choice(name: 'DEPLOY_API', choices: ['true', 'false'], description: 'Deploy API after importing Swagger file?')
+        choice(name: 'action', choices: 'import&deploy\ncreatenewapigateway', description: 'Choose import&deploy/create')
+        string(name: 'AWS_REGION', description: " AWS_REGION", defaultValue: 'us-east-1')
+        string(name: 'API_STAGE', description: "API_STAGE", defaultValue: 'exp-dev')
+        //string(name: 'API_ID', description: "API_ID", defaultValue: 'cwot8inuq1')
+        string(name: 'S3_BUCKET', description: "S3_BUCKET", defaultValue: 'exp-dev-foundation')
+        //choice(name: 'env_swagger_file', choices: 'dev-launch\nqa_launch\nprod1\nprod2\nDevlaunch-Docusign-Jenkins-testing.yaml', description: 'Choose env swagger file to deploy')
+        //string(name: 'S3_SWAGGER_FILE_NAME', description: "S3_SWAGGER_FILE_NAME", defaultValue: 'DASH_DATALAKE.json')
+        
+    }
+    
+    environment 
+    {
+        /*AWS_REGION = 'us-east-1'
+        S3_BUCKET = 'exp-dev-foundation'
+        API_ID = 'cwot8inuq1'
+        API_STAGE = 'exp-dev'
+        GITHUB_REPO = 'git@github.com:proterra-inc/apigateway.git'
+        GITHUB_FILE_PATH = 'path/to/swagger.yaml'*/
+        //S3_SWAGGER_FILE_NAME = 'DASH_DATALAKE.json'
+        S3_SWAGGER_FILE_NAME = 'sample_swagger_file.json'
+        //SWAGGER_FILE="/var/lib/jenkins/Devlaunch-Docusign-Jenkins-testing.yaml"
+    }
+    
+    stages 
+    {
+    
+        stage('Clone repo & Fetch Parameters File') {
+        when { expression {  params.action == 'import&deploy' } }
+        steps {
+            script {
+                
+                git branch: 'master', credentialsId: 'connected_github', url: 'git@github.com:proterra-inc/apigateway.git'
+                
+
+                // Read file from repository
+                /*def fileContents = readFile 'Swaggers/testdir/testfile.txt'
+
+                // Split file contents into lines
+                def lines = fileContents.readLines()
+
+                // Create choice parameters from lines
+                def choices = []
+                for (int i = 0; i < lines.size(); i++) {
+                    def line = lines[i].trim()
+                    choices.add(line)
+                }
+
+                parameters {
+                    choice(name: 'FILE_CHOICE_PARAM', choices: choices, description: 'Choose an option from file')
+                }*/
+                
+                echo "APIGatewayID: ${params.APIGATEWAYNAMEAPIID}"
+                
+                def keyvaluepair = sh(script: "cat /var/lib/jenkins/workspace/clone-apigateway-repo/Swaggers/testdir/output.properties | grep ${params.APIGATEWAYNAMEAPIID}", returnStdout: true).trim()
+                
+                //String keyvaluepair= sh "cat /var/lib/jenkins/workspace/devlaunch-apigateway-swaggers-deploy-test/Swaggers/testdir/testfile.properties | grep ${params.APIGATEWAYNAMEAPIID}"
+                echo "APIGATEWAYNAMEAPIID: ${keyvaluepair}"
+                
+                
+                // Splitting the string by tab
+                def splitValues = keyvaluepair.split('\t')
+
+                // Printing each split value
+                splitValues.each { value ->
+                    println "Split value: $value"
+                }
+                
+                env.FolderName= splitValues[0]
+                env.ServiceName= splitValues[1]
+                env.Environment= splitValues[2]
+                env.APIGatewayID= splitValues[3]
+                
+                println "First part: ${env.FolderName}"
+                println "Second part: ${env.ServiceName}"
+                println "Third part: ${env.Environment}"
+                println "Fourth part: ${env.APIGatewayID}"
+                
+                //echo "APIGATEWAYNAME: ${keyvaluepair}.[0]"
+                //echo "APIID: ${keyvaluepair}"
+                    
+                    
+                /*def multiLevelParam = params.APIGATEWAYNAMEAPIID
+                multiLevelParam.each { key, values ->
+                    println "Key: $key"
+                    println "Values: $values"
+                }*/
+
+                
+                
+        }
+            }
+        }
+
+
+        stage('Export Swagger file to S3') {
+            when { expression {  params.action == 'import&deploy' } }
+            steps {
+                script {
+                    //sh "aws apigateway get-export --rest-api-id ${params.API_ID} --stage-name ${params.API_STAGE} --export-type swagger --accepts application/json $S3_SWAGGER_FILE_NAME"
+                    sh "aws apigateway get-export --rest-api-id ${env.APIGatewayID} --stage-name ${params.API_STAGE} --export-type swagger --accepts application/json $S3_SWAGGER_FILE_NAME"
+                    
+                    println "Swagger file to be exported into S3 bucket before versioning: ${S3_SWAGGER_FILE_NAME}"
+                    
+                    // Get the current date and time
+                    //def currentDate = new Date()
+                    // Define the date format you want
+                    //def dateFormat = new SimpleDateFormat("yyyyMMdd_HHmmss")
+                    // Format the date and time
+                    //def formattedDate = dateFormat.format(currentDate)
+                    
+                    //println new Date().format.('yyyyMMddHH:mm:ss')
+                    
+                    //def formattedDate = new Date().format.('yyyyMMddHH:mm:ss')
+                    
+                    // Rename or version your YAML file
+                    //def originalFileName = "original.yaml"
+                    //def versionedFileName = "original_${formattedDate}.yaml"
+                    
+                    // Renaming the file
+                   // sh "mv ${originalFileName} ${versionedFileName}"
+                    
+                    //println new Date().format.('yyyyMMddHH:mm:ss')
+                    
+                    //println "Swagger file to be exported into S3 bucket after versioning: ${versionedFileName}"
+                    
+                    def formattedDate = sh(returnStdout: true, script: 'date +%Y-%m-%d_%H-%M-%S').trim()
+                    println "Formatted date: ${formattedDate}"
+                    
+                    // Rename or version your YAML file
+                    def originalSwaggerFile = "${S3_SWAGGER_FILE_NAME}"
+                    def versionedSwaggerFile = "${env.APIGatewayID}_${formattedDate}.json"
+                    
+                    // Renaming the file
+                    sh "cp ${originalSwaggerFile} ${versionedSwaggerFile}"
+                    
+                    println "Swagger file to be exported into S3 bucket after versioning: ${versionedSwaggerFile}"
+                    
+                    sh "aws s3 cp ${versionedSwaggerFile} s3://${params.S3_BUCKET}/${versionedSwaggerFile}"
+                }
+            }
+        }
+        
+        stage('Import Swagger file from GitHub') {
+            when { expression {  params.action == 'import&deploy' } }
+            steps {
+                script {
+                    
+                    //sh "curl -o $SWAGGER_FILE_NAME $GITHUB_REPO/$GITHUB_FILE_PATH"
+                    ///var/lib/jenkins/Devlaunch-Docusign-Jenkins-testing.yaml
+                    //SWAGGER_FILE="Swaggers/DASH/${params.env_swagger_file}.json"
+                    SWAGGER_FILE="${env.FolderName}/${env.ServiceName}/${env.Environment}.json"
+                    println "Swagger file to be deployed: ${SWAGGER_FILE}"
+                }
+            }
+        }
+        
+        stage('Deploy API Gateway') {
+            when { expression {  params.action == 'import&deploy' } }
+            steps {
+                script {
+                    sh "aws apigateway put-rest-api --rest-api-id ${env.APIGatewayID} --mode merge --region ${params.AWS_REGION} --body fileb://$SWAGGER_FILE"
+                    def deployment_id = sh(script: "aws apigateway create-deployment --rest-api-id ${env.APIGatewayID} --stage-name $API_STAGE --region ${params.AWS_REGION} --query 'id' --output text", returnStdout: true).trim()
+                    echo "Deployment_ID: $deployment_id"
+                }
+            }
+        }
+    }
+}
+
+----------------------------------------------------------------------------------------------------------------
+
+https://jenkins-connected-exp.proterra.com:8443/view/DEVOPS/job/exp-start-stop-ocpp-ec2-instances/
+
+pipeline {
+    agent any
+    
+    parameters {
+        //string(name: 'INSTANCE_IDS', description: 'Comma-separated list of EC2 instance IDs', defaultValue: '')
+        // Add other parameters as needed
+        choice(name: 'action', choices: 'Start_EC2_Instances\nStop_EC2_Instances', description: 'Choose startec2instances/stopec2instances')
+    }
+    
+    stages {
+        stage('Start EC2 Instances') {
+            when { expression {  params.action == 'Start_EC2_Instances' } }
+            steps {
+                script {
+                    
+                    
+                    println "First part: ${params.Environment}"
+                    println "Second part: ${params.Instances}"
+                    //println "First part: ${env.FolderName}"
+                    def instanceIds = params.Instances.split(',')
+                    catchError {
+                    for (String i : instanceIds) {
+                        println "Instance_ID is: ${i}"
+                        
+                    }
+                    }
+                    
+                    catchError {
+                    for (String instanceId : instanceIds) {
+                        println "Instance_ID is: ${instanceId}"
+                        catchError {
+                        sh "aws ec2 start-instances --instance-ids ${instanceId}"
+                        }
+                    }
+                    }
+                }
+            }
+        }
+        
+        stage('Stop EC2 Instances') {
+            when { expression {  params.action == 'Stop_EC2_Instances' } }
+            steps {
+                script {
+                    
+                    
+                    println "First part: ${params.Environment}"
+                    println "Second part: ${params.Instances}"
+                    //println "First part: ${env.FolderName}"
+                    def instanceIds = params.Instances.split(',')
+                    catchError {
+                    for (String i : instanceIds) {
+                        println "Instance_ID is: ${i}"
+                        
+                    }
+                    }
+                    
+                    catchError {
+                    for (String instanceId : instanceIds) {
+                        println "Instance_ID is: ${instanceId}"
+                        catchError {
+                        sh "aws ec2 stop-instances --instance-ids ${instanceId}"
+                        }
+                    }
+                    }
+                }
+            }
+        }
+    }
+}
+
+----------------------------------------------------------------------------------------------------------------
+
+https://jenkins-connected-exp.proterra.com:8443/view/DEVOPS/job/Test_job_kubectl_apply_devlaunch/
+
+pipeline {
+    agent any
+    
+    stages {
+        stage('Clone Repositories & Apply YAML Files') {
+            steps {
+
+                script{
+					read_file= "/var/lib/jenkins/valencedevelopersrepos.list"
+					def filePath = readFile "${read_file}"			
+							def lines = filePath.readLines() 
+							//sh "`rm /var/lib/jenkins/DomainReferencesdetails.txt`"
+					       //sh "`rm /var/lib/jenkins/DomainReferencesdetails_MAIN.txt`"
+					       sh'kubectl config use-context arn:aws:eks:us-east-1:493000495847:cluster/proterra-mdc-eks-cluster'
+							for (line in lines) {
+									stage('SCM') {
+                                     
+                                      def jdk = tool name: 'java11'
+                                  env.JAVA_HOME = "${jdk}"
+                                  git branch: "$branch_name", credentialsId: 'spandanapotnuru', url: "git@github.com:proterra-inc/${line}.git"
+                                  echo "Working on repo $line"
+                // Clone multiple repositories
+                //git branch: 'dev-r37', credentialsId: 'spandanapotnuru', url: 'git@github.com:proterra-inc/${line}.git'
+                //git branch: 'main', credentialsId: 'your-github-creds', url: 'https://github.com/your-org/repo2.git'
+                // Add more repositories as needed
+
+                // Change directory to where YAML files are
+                catchError {
+                dir('kubernetes/') {
+                    // Apply YAML files
+                    sh 'kubectl apply -f dev_launch.yml'
+                    //sh 'kubectl apply -f file2.yml'
+                    // Apply more YAML files as needed
+                }
+                }
+                
+                
+                
+            }
+        }
+        
+        cleanWs()
+        
+    }
+}
+        }
+    }
+}
+
+----------------------------------------------------------------------------------------------------------------
+
+https://jenkins-connected-exp.proterra.com:8443/view/DEVOPS/job/Test-secrets-kubectl-apply-devlaunch/4/replay/
+
+pipeline {
+    agent any
+    stages {
+        stage('Clone Repositories') {
+            steps {
+                catchError {
+
+                sh 'kubectl config use-context arn:aws:eks:us-east-1:493000495847:cluster/proterra-mdc-eks-cluster'
+                // Clone multiple repositories
+                git branch: 'dev-r37', credentialsId: 'spandanapotnuru', url: 'git@github.com:proterra-inc/valence_secrets.git'
+                //git branch: 'main', credentialsId: 'your-github-creds', url: 'https://github.com/your-org/repo2.git'
+                // Add more repositories as needed
+                }
+            }
+        }
+        stage('Apply YAML Files') {
+            steps {
+                catchError {
+                // Change directory to where YAML files are
+                dir('secrets/dev_launch/') {
+                    // Apply YAML files
+                    sh 'kubectl apply -f reporting-service.yml'
+                    //sh 'kubectl apply -f file2.yml'
+                    // Apply more YAML files as needed
+                }
+                }
+            }
+        }
+    }
+}
+----------------------------------------------------------------------------------------------------------------
+
+https://jenkins-connected-exp.proterra.com:8443/view/DEVOPS/job/Test_job_kubectl_apply_devlaunch_subfolders_and_multipleservices/configure
+
+pipeline {
+    agent any
+    
+    stages {
+        stage('Clone assetmgmt & kubectl apply') {
+            steps {
+                catchError {
+                
+                sh 'kubectl config use-context arn:aws:eks:us-east-1:493000495847:cluster/proterra-mdc-eks-cluster'
+                // Clone multiple repositories
+                git branch: 'dev-r37', credentialsId: 'spandanapotnuru', url: 'git@github.com:proterra-inc/assetmgmt.git'
+                //git branch: 'main', credentialsId: 'your-github-creds', url: 'https://github.com/your-org/repo2.git'
+                // Add more repositories as needed
+
+                // Change directory to where YAML files are
+                dir('charger-manager/kubernetes/') {
+                    // Apply YAML files
+                    sh 'kubectl apply -f dev_launch.yml'
+                    //sh 'kubectl apply -f file2.yml'
+                    // Apply more YAML files as needed
+                }
+                }
+            }
+        }
+
+        stage('Clone faultdb & kubectl apply') {
+            steps {
+
+                catchError {
+                sh 'kubectl config use-context arn:aws:eks:us-east-1:493000495847:cluster/proterra-mdc-eks-cluster'
+                // Clone multiple repositories
+                git branch: 'dev-r37', credentialsId: 'spandanapotnuru', url: 'git@github.com:proterra-inc/fault-db.git'
+                //git branch: 'main', credentialsId: 'your-github-creds', url: 'https://github.com/your-org/repo2.git'
+                // Add more repositories as needed
+
+                // Change directory to where YAML files are
+                dir('faultdb/kubernetes/') {
+                    // Apply YAML files
+                    sh 'kubectl apply -f dev_launch.yml'
+                    //sh 'kubectl apply -f file2.yml'
+                    // Apply more YAML files as needed
+                }
+                }
+            }
+        }
+        
+        stage('Clone reporting-service & kubectl apply') {
+            steps {
+
+                catchError {
+                sh 'kubectl config use-context arn:aws:eks:us-east-1:493000495847:cluster/proterra-mdc-eks-cluster'
+                // Clone multiple repositories
+                git branch: 'dev-r37', credentialsId: 'spandanapotnuru', url: 'git@github.com:proterra-inc/reporting-service.git'
+                //git branch: 'main', credentialsId: 'your-github-creds', url: 'https://github.com/your-org/repo2.git'
+                // Add more repositories as needed
+
+                // Change directory to where YAML files are
+                dir('kubernetes/') {
+                    // Apply YAML files
+                    sh 'kubectl apply -f dev_launch.yml'
+                    //sh 'kubectl apply -f file2.yml'
+                    // Apply more YAML files as needed
+                }
+                }
+            }
+        }
+
+        stage('Clone hvipdb & kubectl apply') {
+            steps {
+
+                catchError {
+                sh 'kubectl config use-context arn:aws:eks:us-east-1:493000495847:cluster/proterra-mdc-eks-cluster'
+                // Clone multiple repositories
+                git branch: 'dev-r37', credentialsId: 'spandanapotnuru', url: 'git@github.com:proterra-inc/hvip-db.git'
+                //git branch: 'main', credentialsId: 'your-github-creds', url: 'https://github.com/your-org/repo2.git'
+                // Add more repositories as needed
+
+                // Change directory to where YAML files are
+                dir('geoprogramdb/kubernetes/') {
+                    // Apply YAML files
+                    sh 'kubectl apply -f dev_launch.yml'
+                    
+                    //sh 'kubectl apply -f file2.yml'
+                    // Apply more YAML files as needed
+                }
+                }
+
+            }
+        }
+
+        stage('Clone bcanaggregationservice & kubectl apply') {
+            steps {
+
+                catchError {
+                sh 'kubectl config use-context arn:aws:eks:us-east-1:493000495847:cluster/proterra-mdc-eks-cluster'
+                // Clone multiple repositories
+                git branch: 'dev-r37', credentialsId: 'spandanapotnuru', url: 'git@github.com:proterra-inc/bcan-aggregation-service.git'
+                //git branch: 'main', credentialsId: 'your-github-creds', url: 'https://github.com/your-org/repo2.git'
+                // Add more repositories as needed
+
+                // Change directory to where YAML files are
+                dir('bcan-aggregation-worker/kubernetes/') {
+                    // Apply YAML files
+                    sh 'kubectl apply -f dev_launch.yml'
+                    
+                    //sh 'kubectl apply -f file2.yml'
+                    // Apply more YAML files as needed
+                }
+                }
+
+            }
+        }
+
+        stage('Clone demand-management & kubectl apply') {
+            steps {
+
+                catchError {
+                sh 'kubectl config use-context arn:aws:eks:us-east-1:493000495847:cluster/proterra-mdc-eks-cluster'
+                // Clone multiple repositories
+                git branch: 'dev-r37', credentialsId: 'spandanapotnuru', url: 'git@github.com:proterra-inc/demand-management.git'
+                //git branch: 'main', credentialsId: 'your-github-creds', url: 'https://github.com/your-org/repo2.git'
+                // Add more repositories as needed
+
+                // Change directory to where YAML files are
+                dir('chargeroptimizerservice/kubernetes/') {
+                    // Apply YAML files
+                    sh 'kubectl apply -f dev_launch.yml'
+                    
+                    
+                    //sh 'kubectl apply -f file2.yml'
+                    // Apply more YAML files as needed
+                }
+                dir('demand-schedule-service/kubernetes/') {
+                    // Apply YAML files
+                    sh 'kubectl apply -f dev_launch.yml'
+                    
+                    
+                    //sh 'kubectl apply -f file2.yml'
+                    // Apply more YAML files as needed
+                }
+                }
+
+            }
+        }
+
+        stage('Clone apex-pipeline-processor & kubectl apply') {
+            steps {
+
+                catchError {
+                sh 'kubectl config use-context arn:aws:eks:us-east-1:493000495847:cluster/proterra-mdc-eks-cluster'
+                // Clone multiple repositories
+                git branch: 'dev-r37', credentialsId: 'spandanapotnuru', url: 'git@github.com:proterra-inc/apex-pipeline-processor.git'
+                //git branch: 'main', credentialsId: 'your-github-creds', url: 'https://github.com/your-org/repo2.git'
+                // Add more repositories as needed
+
+                // Change directory to where YAML files are
+                dir('logstash-configs/kubernetes/') {
+                    // Apply YAML files
+                    sh 'kubectl apply -f dev_launch_ocpp.yml'
+                    sh 'kubectl apply -f dev_launch_pcan.yml'
+                    
+                    //sh 'kubectl apply -f file2.yml'
+                    // Apply more YAML files as needed
+                }
+                dir('bus-shadow-ingestor/kubernetes/') {
+                    // Apply YAML files
+                    sh 'kubectl apply -f dev_launch.yml'
+                    
+                    
+                    //sh 'kubectl apply -f file2.yml'
+                    // Apply more YAML files as needed
+                }
+                dir('ocpp-shadow-ingestor/kubernetes/') {
+                    // Apply YAML files
+                    sh 'kubectl apply -f dev_launch.yml'
+                    
+                    
+                    //sh 'kubectl apply -f file2.yml'
+                    // Apply more YAML files as needed
+                }
+                dir('toucan-data-processor/kubernetes/') {
+                    // Apply YAML files
+                    sh 'kubectl apply -f dev_launch.yml'
+                    
+                    
+                    //sh 'kubectl apply -f file2.yml'
+                    // Apply more YAML files as needed
+                }
+                }
+
+            }
+        }
+
+        stage('Clone ocpp-aggregation-service & kubectl apply') {
+            steps {
+
+                catchError {
+                sh 'kubectl config use-context arn:aws:eks:us-east-1:493000495847:cluster/proterra-mdc-eks-cluster'
+                // Clone multiple repositories
+                git branch: 'dev-r37', credentialsId: 'spandanapotnuru', url: 'git@github.com:proterra-inc/ocpp-aggregation-service.git'
+                //git branch: 'main', credentialsId: 'your-github-creds', url: 'https://github.com/your-org/repo2.git'
+                // Add more repositories as needed
+
+                // Change directory to where YAML files are
+                dir('ocpp-agg-worker/kubernetes/') {
+                    // Apply YAML files
+                    sh 'kubectl apply -f dev_launch.yml'
+                    
+                    
+                    //sh 'kubectl apply -f file2.yml'
+                    // Apply more YAML files as needed
+                }
+                }
+
+            }
+        }
+
+
+        stage('Clone valence-alerts & kubectl apply') {
+            steps {
+
+                catchError {
+                sh 'kubectl config use-context arn:aws:eks:us-east-1:493000495847:cluster/proterra-mdc-eks-cluster'
+                // Clone multiple repositories
+                git branch: 'dev-r37', credentialsId: 'spandanapotnuru', url: 'git@github.com:proterra-inc/valence-alerts.git'
+                //git branch: 'main', credentialsId: 'your-github-creds', url: 'https://github.com/your-org/repo2.git'
+                // Add more repositories as needed
+
+                // Change directory to where YAML files are
+                dir('alerts-notification/kubernetes/') {
+                    // Apply YAML files
+                    sh 'kubectl apply -f dev_launch.yml'
+                    
+                    
+                    //sh 'kubectl apply -f file2.yml'
+                    // Apply more YAML files as needed
+                }
+
+
+                dir('alerts-processor/kubernetes/') {
+                    // Apply YAML files
+                    sh 'kubectl apply -f dev_launch_realtime.yml'
+                    sh 'kubectl apply -f dev_launch_schedule_service.yml'
+                    
+                    //sh 'kubectl apply -f file2.yml'
+                    // Apply more YAML files as needed
+                }
+                }
+
+            }
+        }
+
+
+        stage('Clone data-lake-apis & kubectl apply') {
+            steps {
+
+                catchError {
+                sh 'kubectl config use-context arn:aws:eks:us-east-1:493000495847:cluster/proterra-mdc-eks-cluster'
+                // Clone multiple repositories
+                git branch: 'dev-r37', credentialsId: 'spandanapotnuru', url: 'git@github.com:proterra-inc/data-lake-apis.git'
+                //git branch: 'main', credentialsId: 'your-github-creds', url: 'https://github.com/your-org/repo2.git'
+                // Add more repositories as needed
+
+                // Change directory to where YAML files are
+
+                dir('internal-data-apis/kubernetes/') {
+                    // Apply YAML files
+                    sh 'kubectl apply -f dev_launch.yml'
+                    
+                    
+                    //sh 'kubectl apply -f file2.yml'
+                    // Apply more YAML files as needed
+                }
+
+
+                dir('data-lake-apis/kubernetes/') {
+                    // Apply YAML files
+                    sh 'kubectl apply -f dev_launch_datalake.yml'
+                    sh 'kubectl apply -f dev_launch_cachejobs.yml'
+                    
+                    //sh 'kubectl apply -f file2.yml'
+                    // Apply more YAML files as needed
+                }
+                }
+
+            }
+        }
+
+        stage('Clone rbac_ams & kubectl apply') {
+            steps {
+
+                catchError {
+                sh 'kubectl config use-context arn:aws:eks:us-east-1:493000495847:cluster/proterra-mdc-eks-cluster'
+                // Clone multiple repositories
+                git branch: 'dev-r37', credentialsId: 'spandanapotnuru', url: 'git@github.com:proterra-inc/rbac_ams.git'
+                //git branch: 'main', credentialsId: 'your-github-creds', url: 'https://github.com/your-org/repo2.git'
+                // Add more repositories as needed
+
+                // Change directory to where YAML files are
+                dir('rbac-ams/kubernetes/') {
+                    // Apply YAML files
+                    sh 'kubectl apply -f dev_launch_ams.yml'
+                    sh 'kubectl apply -f dev_launch_amsjobs.yml'
+                    
+                    //sh 'kubectl apply -f file2.yml'
+                    // Apply more YAML files as needed
+                }
+                }
+
+            }
+        }
+
+        stage('Clone edmonton-ccss & kubectl apply') {
+            steps {
+
+                catchError {
+                sh 'kubectl config use-context arn:aws:eks:us-east-1:493000495847:cluster/proterra-mdc-eks-cluster'
+                // Clone multiple repositories
+                git branch: 'dev-r37', credentialsId: 'spandanapotnuru', url: 'git@github.com:proterra-inc/edmonton-ccss.git'
+                //git branch: 'main', credentialsId: 'your-github-creds', url: 'https://github.com/your-org/repo2.git'
+                // Add more repositories as needed
+
+                // Change directory to where YAML files are
+                dir('ccss/kubernetes/') {
+                    // Apply YAML files
+                    sh 'kubectl apply -f dev_launch.yml'
+                    
+                    
+                    //sh 'kubectl apply -f file2.yml'
+                    // Apply more YAML files as needed
+                }
+                }
+
+            }
+        }
+
+        stage('Clone apex_business_tier & kubectl apply') {
+            steps {
+
+                catchError {
+                sh 'kubectl config use-context arn:aws:eks:us-east-1:493000495847:cluster/proterra-mdc-eks-cluster'
+                // Clone multiple repositories
+                git branch: 'dev-r37', credentialsId: 'spandanapotnuru', url: 'git@github.com:proterra-inc/apex_business_tier.git'
+                //git branch: 'main', credentialsId: 'your-github-creds', url: 'https://github.com/your-org/repo2.git'
+                // Add more repositories as needed
+
+                // Change directory to where YAML files are
+                dir('apex_business_app/kubernetes/') {
+                    // Apply YAML files
+                    sh 'kubectl apply -f dev_launch.yml'
+                    
+                    
+                    //sh 'kubectl apply -f file2.yml'
+                    // Apply more YAML files as needed
+                }
+                }
+
+            }
+        }
+
+        stage('Clone bus-aggregation-service & kubectl apply') {
+            steps {
+
+                catchError {
+                sh 'kubectl config use-context arn:aws:eks:us-east-1:493000495847:cluster/proterra-mdc-eks-cluster'
+                // Clone multiple repositories
+                git branch: 'dev-r37', credentialsId: 'spandanapotnuru', url: 'git@github.com:proterra-inc/bus-aggregation-service.git'
+                //git branch: 'main', credentialsId: 'your-github-creds', url: 'https://github.com/your-org/repo2.git'
+                // Add more repositories as needed
+
+                // Change directory to where YAML files are
+
+                dir('pcan-service/kubernetes/') {
+                    // Apply YAML files
+                    sh 'kubectl apply -f dev_launch.yml'
+                    
+                    
+                    //sh 'kubectl apply -f file2.yml'
+                    // Apply more YAML files as needed
+                }
+
+                dir('pcan-bus-aggregation-worker/kubernetes/') {
+                    // Apply YAML files
+                    sh 'kubectl apply -f dev_launch_customagg.yml'
+                    sh 'kubectl apply -f dev_launch_pcan_critical.yml'
+                    sh 'kubectl apply -f dev_launch_pcan_nc.yml'
+                    
+                    //sh 'kubectl apply -f file2.yml'
+                    // Apply more YAML files as needed
+                }
+                }
+
+            }
+        }
+        
+        stage('Clone chargemgmt-abb & kubectl apply') {
+            steps {
+
+                catchError {
+                sh 'kubectl config use-context arn:aws:eks:us-east-1:493000495847:cluster/proterra-mdc-eks-cluster'
+                // Clone multiple repositories
+                git branch: 'abb-dev-r37', credentialsId: 'spandanapotnuru', url: 'git@github.com:proterra-inc/chargemgmt.git'
+                //git branch: 'main', credentialsId: 'your-github-creds', url: 'https://github.com/your-org/repo2.git'
+                // Add more repositories as needed
+
+                // Change directory to where YAML files are
+                dir('kubernetes/') {
+                    // Apply YAML files
+                    sh 'kubectl apply -f dev_launch.yml'
+                    
+                    
+                    //sh 'kubectl apply -f file2.yml'
+                    // Apply more YAML files as needed
+                }
+                }
+
+            }
+        }
+
+
+        stage('Clone chargemgmt-v2g & kubectl apply') {
+            steps {
+
+                catchError {
+                sh 'kubectl config use-context arn:aws:eks:us-east-1:493000495847:cluster/proterra-mdc-eks-cluster'
+                // Clone multiple repositories
+                git branch: 'v2g-dev-r37', credentialsId: 'spandanapotnuru', url: 'git@github.com:proterra-inc/chargemgmt.git'
+                //git branch: 'main', credentialsId: 'your-github-creds', url: 'https://github.com/your-org/repo2.git'
+                // Add more repositories as needed
+
+                // Change directory to where YAML files are
+                dir('kubernetes/') {
+                    // Apply YAML files
+                    sh 'kubectl apply -f dev_launch.yml'
+                    
+                    
+                    //sh 'kubectl apply -f file2.yml'
+                    // Apply more YAML files as needed
+                }
+                }
+
+            }
+        }
+
+
+
+
+
+
+
+
+    }
+}
+----------------------------------------------------------------------------------------------------------------
+https://jenkins-connected-exp.proterra.com:8443/view/DEVOPS/job/Dev-Launch-Lambda-Deployment/30/replay/
+
+pipeline {
+    agent any
+ 
+    environment {
+     //   AWS_REGION = 'us-east-1'
+       // LAMBDA_FUNCTION_NAME = 'dev-launch2020-jenkins-test-function-PoC'
+        //S3_BUCKET = 'exp-dev-foundation'
+        //GITHUB_REPO = 'git@github.com:proterra-inc/apex-pipeline-processor.git'
+      //  GITHUB_BRANCH = 'dev-r36'
+        TEMP_DIR = '/var/lib/jenkins/lambda/31012024'
+        ZIP_FILE = 'lambda-deployment-package.zip'
+    }
+ 
+    stages {
+        stage('Checkout') {
+            steps {
+                git branch: "${GITHUB_BRANCH}", credentialsId: 'connected_github', url: "git@github.com:proterra-inc/${GITHUB_REPO}.git"
+            }
+        }
+ 
+        stage('Package') {
+            steps {
+                script {
+                    sh 'mkdir -p $TEMP_DIR'
+                    sh 'cp -r aws-lambda-python/getPCSChargerStatus/dev/* $TEMP_DIR/'
+                    sh 'cd $TEMP_DIR && zip -r ../$ZIP_FILE .'
+                }
+            }
+        }
+ 
+        stage('Upload to S3') {
+            steps {
+                script {
+                        
+                        //sh "aws s3 cp /var/lib/jenkins/lambda/lambda-deployment-package.zip s3://$S3_BUCKET/"
+                        
+                        sh "aws s3 cp /var/lib/jenkins/lambda/$ZIP_FILE s3://$S3_BUCKET/"
+                    }
+                }
+            }
+       
+ 
+        stage('Deploy Lambda') {
+            steps {
+                script {
+                    withAWS(region: AWS_REGION) {
+                        sh "aws lambda update-function-code --function-name $LAMBDA_FUNCTION_NAME --s3-bucket $S3_BUCKET --s3-key $ZIP_FILE"
+                    }
+                }
+            }
+        }
+    }
+}
+----------------------------------------------------------------------------------------------------------------
+https://jenkins-connected-exp.proterra.com:8443/view/DEVOPS/job/EXP-START-OPENSEARCH-SERVER-ON-DEMAND/configure
+
+#!/bin/bash
+echo $Environment
+echo $Servers
+
+IFS="," read -a myarray <<< $Servers
+
+echo "My array: ${myarray[@]}"
+echo "Number of elements in the array: ${#myarray[@]}"
+
+
+for value in "${myarray[@]}"; do
+    echo "$value"
+    aws ec2 start-instances --instance-ids $value
+done
+
+
+
+
+
+
+
+
+
+
+
+
+#readarray -t NewArray < <(printf '%s\n' "${myarray[@]}" | awk '!x[$0]++')
+
+#echo "My newarray: ${NewArray[@]}"
+
+# cat /tmp/split-string.sh
+
+
+#myvar="string1,string2,string3"
+
+# Here comma is our delimiter value
+
+
+#$ b=$(pwd)
+#$ echo $b
+
+
+
+#uniqs_arr=($(for ip in "${ip_addrs[@]}"; do echo "${ip}"; done | sort -u))
+#A="$(cut -d',' -f1 <<<"$Servers")"
+#B="$(cut -d',' -f2 <<<"$Servers")"
+#C="$(cut -d',' -f3 <<<"$Servers")"
+#echo "$A"
+#echo "$B"
+#echo "$C"
+
+#54.166.253.57 -->  i-0e336aefef9d8e4fa  ---> DEV-OPENSEARCH-OCPP-NON-ABB-UP-SERVICES
+
+#param([String[]] $Servers)
+
+#foreach ($ServerName in $Servers)
+#aws ec2 stop-instances --instance-ids $ServerName
+
+#Iterating each of the modules 
+
+#String[] Server_Array = "${params.Servers}".split(',');
+            #for (x in Server_Array) {
+               #aws ec2 stop-instances --instance-ids ${x}
+            #}
+            
+
+           # echo "Environment total: $Servers"
+            #String[] Env_Array = ${Servers}.split(',');
+            
+            #for (x in Env_Array) {
+              #aws ec2 stop-instances --instance-ids ${x}
+             # }
+                 # for (x in Env_Array) {
+                  #echo "ENV: ${x}"
+                  #}
+#in="foo@bar;bizz@buzz;fizz@buzz;buzz@woof"
+#IFS=',' list={$Servers}
+#for item in "${list[@]}"; do echo $item; done                  
+                  
+#aws ec2 stop-instances --instance-ids $Servers
+
+
+
+----------------------------------------------------------------------------------------------------------------
+https://jenkins-connected-exp.proterra.com:8443/view/DEVOPS/job/EXP-UP-OPENSEARCH-SERVICE/configure
+
+# Description: copy jar file to OCPP server & restart ocpp service.
+TARGET_SERVER=54.166.233.230
+TARGET_PEM_PATH="/var/lib/jenkins/pem/opensearch.pem"
+echo "Start OPEN SEARCH"
+
+ssh -i ${TARGET_PEM_PATH}  -o StrictHostKeyChecking=no ec2-user@${TARGET_SERVER}  <<EOF
+#!/bin/bash 
+set -x
+
+echo "Start OPEN SEARCH"
+cd /home/ec2-user/OpenSearchDocker
+sudo docker ps
+sleep 10s
+pwd
+docker-compose up -d
+sleep 30s
+sudo docker ps
+EOF
+
+
+----------------------------------------------------------------------------------------------------------------
+https://jenkins-connected-exp.proterra.com:8443/view/DEVOPS/job/EXP-DOWN-OPENSEARCH-SERVICE/configure
+
+# Description: copy jar file to OCPP server & restart ocpp service.
+TARGET_SERVER=54.166.233.230
+TARGET_PEM_PATH="/var/lib/jenkins/pem/opensearch.pem"
+echo "StOPPING OPEN SEARCH"
+
+ssh -i ${TARGET_PEM_PATH}  -o StrictHostKeyChecking=no ec2-user@${TARGET_SERVER}  <<EOF
+#!/bin/bash 
+set -x
+
+echo "StOPPING OPEN SEARCH"
+cd /home/ec2-user/OpenSearchDocker
+sudo docker ps
+sleep 10s
+pwd
+docker-compose down
+sleep 10s
+sudo docker ps
+EOF
+
+echo "============== Done ============="
+
+----------------------------------------------------------------------------------------------------------------
+
+https://jenkins-connected-exp.proterra.com:8443/view/DEVOPS/job/EXP-START-OPENSEARCH-SERVER-ON-DEMAND/configure
+
+#!/bin/bash
+echo $Environment
+echo $Servers
+
+IFS="," read -a myarray <<< $Servers
+
+echo "My array: ${myarray[@]}"
+echo "Number of elements in the array: ${#myarray[@]}"
+
+
+for value in "${myarray[@]}"; do
+    echo "$value"
+    aws ec2 start-instances --instance-ids $value
+done
+
+
+
+
+
+
+
+
+
+
+
+
+#readarray -t NewArray < <(printf '%s\n' "${myarray[@]}" | awk '!x[$0]++')
+
+#echo "My newarray: ${NewArray[@]}"
+
+# cat /tmp/split-string.sh
+
+
+#myvar="string1,string2,string3"
+
+# Here comma is our delimiter value
+
+
+#$ b=$(pwd)
+#$ echo $b
+
+
+
+#uniqs_arr=($(for ip in "${ip_addrs[@]}"; do echo "${ip}"; done | sort -u))
+#A="$(cut -d',' -f1 <<<"$Servers")"
+#B="$(cut -d',' -f2 <<<"$Servers")"
+#C="$(cut -d',' -f3 <<<"$Servers")"
+#echo "$A"
+#echo "$B"
+#echo "$C"
+
+#54.166.253.57 -->  i-0e336aefef9d8e4fa  ---> DEV-OPENSEARCH-OCPP-NON-ABB-UP-SERVICES
+
+#param([String[]] $Servers)
+
+#foreach ($ServerName in $Servers)
+#aws ec2 stop-instances --instance-ids $ServerName
+
+#Iterating each of the modules 
+
+#String[] Server_Array = "${params.Servers}".split(',');
+            #for (x in Server_Array) {
+               #aws ec2 stop-instances --instance-ids ${x}
+            #}
+            
+
+           # echo "Environment total: $Servers"
+            #String[] Env_Array = ${Servers}.split(',');
+            
+            #for (x in Env_Array) {
+              #aws ec2 stop-instances --instance-ids ${x}
+             # }
+                 # for (x in Env_Array) {
+                  #echo "ENV: ${x}"
+                  #}
+#in="foo@bar;bizz@buzz;fizz@buzz;buzz@woof"
+#IFS=',' list={$Servers}
+#for item in "${list[@]}"; do echo $item; done                  
+                  
+#aws ec2 stop-instances --instance-ids $Servers
+
+Groovy script:
+
+
+switch(Environment){
+ case "DevLaunch":
+return [ "P0 - CCSS - Run and Track Components", "P0 - CCSS - Run and Track Reassignment"]
+ break
+case "QALaunch":
+    return [ "BusManagement", "ChargerManagement/AddCharger", "ChargerManagement/ChargerManagement" ]
+break
+ case "DevOpensearch":
+    return [ "i-04dd8f550afb57c4f" ]
+ break
+case "QA2":
+    return [ "BusManagement", "ChargerManagement/AddCharger", "ChargerManagement/ChargerManagement"]
+ break
+} 
+----------------------------------------------------------------------------------------------------------------
+
+https://jenkins-connected-exp.proterra.com:8443/view/DEVOPS/job/EGG-PLANT-RHEL-SLAVE-START/configure
+
+
+TARGET_SERVER=172.30.0.91
+TARGET_PEM_PATH="/var/lib/jenkins/pem/EggPlant-Linux.pem"
+echo "Starting Egg-plant SLAVE"
+
+ssh -i ${TARGET_PEM_PATH}  -o StrictHostKeyChecking=no ec2-user@${TARGET_SERVER}  <<EOF
+#ssh -i EggPlant-Linux.pem centos@34.200.165.3 <<EOF
+#ssh -i pem/EggPlant-Linux.pem ec2-user@172.30.0.91
+#!/bin/bash 
+set -x
+
+echo "START SLAVE"
+sudo java -jar agent.jar -jnlpUrl https://jenkins-connected-exp.proterra.com:8443/computer/Egg%2Dplanttest/jenkins-agent.jnlp -secret dabbd54a7ba066330ca14571bc8e29d2fa02a9e574860565c0d8349bbf2503c6 -workDir "/home" > /dev/null &
+EOF
+
+echo "============== Done ============="
+----------------------------------------------------------------------------------------------------------------
+https://jenkins-connected-exp.proterra.com:8443/view/DEVOPS/job/EXP-STOP-RDS-SERVERS-ON-DEMAND/configure
+
+#!/bin/bash
+echo $Environment
+echo $rds
+
+IFS="," read -a myarray <<< $rds
+
+echo "My array: ${myarray[@]}"
+echo "Number of elements in the array: ${#myarray[@]}"
+
+
+for value in "${myarray[@]}"; do
+    echo "$value"
+    aws rds stop-db-cluster --db-cluster-identifier $value
+   
+   done
+----------------------------------------------------------------------------------------------------------------
+https://jenkins-connected-exp.proterra.com:8443/view/DEVOPS/job/EXP-EKS-NODE-SCALE/configure
+
+#!/bin/bash
+echo $Environment
+echo $cluster
+echo $nodegroup
+
+IFS="," read -a myarray <<< $cluster
+
+echo "My array: ${myarray[@]}"
+echo "Number of elements in the array: ${#myarray[@]}"
+
+
+for value in "${myarray[@]}"; do
+    echo "$value"
+    
+    eksctl scale nodegroup --cluster=$value --nodes=${desire} --name=$nodegroup --region=us-east-1 --nodes-min=${min} --nodes-max=${max}
+   
+   done
+
+----------------------------------------------------------------------------------------------------------------
+https://jenkins-connected-exp.proterra.com:8443/view/DEVOPS/job/DEVOPS-CODECOV-REPO-LIST/configure
+
+rm -rf /var/lib/jenkins/jobs/DEVOPS/Valence_CodeCoverage_Repo.list
+echo  $Repository  |sed 's/,/\n/g' > /var/lib/jenkins/jobs/DEVOPS/Valence_CodeCoverage_Repo.list
+----------------------------------------------------------------------------------------------------------------
+https://jenkins-connected-exp.proterra.com:8443/view/3.%20DEV-LAUNCH-TO-QA-LAUNCH-BuildPromotion/job/DEV-LAUNCH-TO-QA-LAUNCH-VALENCE-DB-VERSIONING-CD/
+
+pipeline {
+   agent any
+stages {
+stage('Clone repository') 
+{
+steps{
+ 
+ checkout scm
+}
+ }
+           
+            stage ('checkout-NonMaster') {
+               
+                steps {
+                    emailext    subject: """${QA_BUILD_APPROVAL_SUBJECT}-valence-db-versioning""",
+                                body: '''<a href="${BUILD_URL}input">click to approve</a>''',
+                                to: "$QA_BUILD_APPROVAL_MAIL",
+                                mimeType: 'text/html' 
+                    script {
+                        def Delay = input id: 'Deploy',
+                            message: sh(script:'''echo "You are promoting build from DevLaunch to QaLaunch"''', returnStdout: true).trim(),
+                            submitter: 'uaserID1, userID2',
+                            parameters: [
+                                    [$class: 'ChoiceParameterDefinition',
+                                     choices: ['no','yes'].join('\n'),
+                                     name: 'input',
+                                     description: 'Please Select "YES" to Build or "NO" to Abort']
+                            ]
+                            echo "The answer is: ${Delay}"
+                            if( "${Delay}" == "yes"){
+							
+                            sh'''echo "${QA_BUILD_APPROVAL_SUBJECT}-valence-db-versioning"'''
+                            } else {
+                            sh """
+                            echo "exiting not Qa LAUNCH ready branch"
+                            exit 1
+                            """
+                            }
+                    }
+}
+}
+stage('Push image to QALaunch ECR repo') 
+            {
+steps
+{
+                   
+                    sh '''aws ecr get-login-password --region us-east-1 | docker login --username AWS --password-stdin 493000495847.dkr.ecr.us-east-1.amazonaws.com '''
+                    sh "docker tag 493000495847.dkr.ecr.us-east-1.amazonaws.com/dev-launch-valence-db-versioning:latest 493000495847.dkr.ecr.us-east-1.amazonaws.com/qa-launch-valence-db-versioning:latest"
+                    sh "docker tag 493000495847.dkr.ecr.us-east-1.amazonaws.com/qa-launch-valence-db-versioning:latest 493000495847.dkr.ecr.us-east-1.amazonaws.com/qa-launch-valence-db-versioning:$BUILD_NUMBER"
+                    sh "docker push 493000495847.dkr.ecr.us-east-1.amazonaws.com/qa-launch-valence-db-versioning:latest"
+                    sh "docker push 493000495847.dkr.ecr.us-east-1.amazonaws.com/qa-launch-valence-db-versioning:$BUILD_NUMBER" 
+}
+                   
+}
+stage('Rancher Deploy in QALaunch') 
+            {
+steps
+{
+sh '''
+kubectl config use-context arn:aws:eks:us-east-1:493000495847:cluster/qa-launch2020-eks-cluster
+kubectl apply -f ${WORKSPACE}/kubernetes/qa_launch.yml
+kubectl rollout restart deployment/valence-db-versioning -n apex
+sleep 40s
+kubectl logs deployment/valence-db-versioning --all-containers -n apex
+'''
+}
+}
+                
+            
+        }
+    }
+
+
+
+----------------------------------------------------------------------------------------------------------------
+https://jenkins-connected-exp.proterra.com:8443/view/OCPP%20Build%20Promotion/job/QALAUNCH-TO-PREPROD-OCPP-AGG-BUILD-PROMOTION/1/replay/
+
+pipeline 
+{
+   agent any
+        stages 
+        {
+           
+            stage ('Mail Approval') 
+            {
+              
+                steps 
+                {
+                    emailext    subject: """${QA_BUILD_APPROVAL_SUBJECT} - OCPP-NON-ABB-PCS""",
+                                body: '''<a href="${BUILD_URL}input">click to approve</a>''',
+                                to: "$QA_BUILD_APPROVAL_MAIL",
+                                mimeType: 'text/html' 
+                        script 
+                        {
+                            def Delay = input id: 'Deploy',
+                                message: sh(script:'''echo "You are promoting build from DevLaunch to QaLaunch "''', returnStdout: true).trim(),
+                                submitter: 'uaserID1, userID2',
+                                parameters: [
+                                        [$class: 'ChoiceParameterDefinition',
+                                        choices: ['no','yes'].join('\n'),
+                                        name: 'input',
+                                        description: 'Please Select "YES" to Build or "NO" to Abort']
+                                ]
+                                echo "The answer is: ${Delay}"
+                                if( "${Delay}" == "yes"){
+                                
+                                sh'''echo "$subject - OCPP-NON-ABB-PCS"'''
+                                } else {
+                                sh """
+                                echo "exiting not Qa Launch ready branch"
+                                exit 1
+                                """
+                                }
+                        }
+                }
+                   
+            }      
+            
+            stage('copy Jar to Preprod OCPP server') 
+            {
+                steps 
+                {
+                    sh '''
+
+
+                    TARGET_SERVER_PREPROD=23.23.121.187
+                    TARGET_PEM_PATH="/var/lib/jenkins/pem/prod1.pem"
+                    
+
+                    SOURCE_JAR="/var/lib/jenkins/ocpp-builds/ocpp-agg-service-0.0.1-SNAPSHOT.jar"
+
+                    echo "Copying Jarfile to Target Preprod OCPP server"
+                    if [ ! -f ${SOURCE_JAR} ]
+                    then
+                        echo "Required jar file does not exists in ${SOURCE_JAR} . Deployment not yet happened.Please check"
+                        exit
+                    fi
+
+                    scp -i  ${TARGET_PEM_PATH}  ${SOURCE_JAR} ec2-user@${TARGET_SERVER_PREPROD}:/tmp
+                    echo "======== Successfully copied JAR file to tmp folder in qalaunch========"
+
+                 #   ssh -i ${TARGET_PEM_PATH}  ec2-user@${TARGET_SERVER_QALAUNCH} /home/ubuntu/uberstart.sh
+                 #   ssh -i ${TARGET_PEM_PATH} ec2-user@${TARGET_SERVER_QALAUNCH} /home/ec2-user/restart.sh <<EOF
+                
+                 #   set -x
+
+                  #  echo "Inside QALAUNCH ocpp server"
+                    
+                   # pwd
+                    #date
+                    #whoami
+                    #cd /tmp
+                    #ls -la
+                    
+                   
+                    
+                    echo "============== Done ============="
+                    '''
+                           
+                }
+            }   
+            
+            
+            
+    
+            
+            
+        }
+}
+    
+   
+
+----------------------------------------------------------------------------------------------------------------
+https://jenkins-connected-exp.proterra.com:8443/view/1.%20DevLaunch-CI/job/DEV-LAUNCH-REPORTING-SERVICE-CI/2/replay/
+
+def myapp
+node ('master') {
+ withEnv(['registry=493000495847.dkr.ecr.us-east-1.amazonaws.com/devlaunch-reporting-service',
+ 'ECRCRED=ecr:us-east-1:AWS-ECR-Jenkins'
+ ]) {
+ 
+ stage('Clone repository') {
+ 
+ checkout scm
+ }
+stage('Build') {
+catchError {
+withMaven(maven: 'Maven 3') {
+   def jdk = tool name: 'java11'
+ env.JAVA_HOME = "${jdk}"
+ sh '''#!/bin/bash 
+ echo "Maven Clean install with test cases..."
+ mvn -f $WORKSPACE/pom.xml -B clean package -Dmaven.test.skip=true
+ '''
+ }
+ }
+ }
+ stage('Image') {
+ //myapp = docker.build "493000495847.dkr.ecr.us-east-1.amazonaws.com/devlaunch-apex-business-tier:latest --build-arg DEP_TYPE=\"DEV\"  -f apex_business_app/Opensearch/DEV/Dockerfile "
+ }
+ 
+  stage('Push image') {
+ catchError {
+ sh '''aws ecr get-login-password --region us-east-1 | docker login --username AWS --password-stdin 493000495847.dkr.ecr.us-east-1.amazonaws.com '''
+ sh "docker build --build-arg DEP_TYPE=\"DEV\" -t devlaunch-reporting-service:latest -f devops/Dockerfile/dev_launch ."
+ sh "docker tag devlaunch-reporting-service:latest 493000495847.dkr.ecr.us-east-1.amazonaws.com/devlaunch-reporting-service:latest"
+ sh "docker push 493000495847.dkr.ecr.us-east-1.amazonaws.com/devlaunch-reporting-service:latest"
+ }
+ }
+
+  stage('Email Log') {
+
+sh 'rm -rf *.txt'
+
+sh "cat /var/lib/jenkins/jobs/${env.JOB_NAME}/builds/${env.BUILD_NUMBER}/log >> ${env.JOB_NAME}_${env.BUILD_NUMBER}_logs.txt"
+
+}	
+ stage ('Send Email') {
+	
+
+archiveArtifacts artifacts: '*.txt', onlyIfSuccessful: true
+//Please find the attached console output of branch commit Number ${GIT_COMMIT_REV} #${gitCommit}
+
+emailext to: "$postbuild_email_address",
+
+subject: "${env.JOB_NAME}#${env.BUILD_NUMBER} Build:${currentBuild.currentResult} ",
+
+body: """
+ <p>Hi Team,
+       
+	   Build for ${env.JOB_NAME}#${env.BUILD_NUMBER} is ${currentBuild.currentResult}.
+	   You can find the console output at <a href='${env.BUILD_URL}'>${env.JOB_NAME} #${env.BUILD_NUMBER}</a>. Also attaching the same for reference.
+	   
+    Regards
+    DevOps Team</p>
+                       """,
+
+
+
+attachmentsPattern: '*.txt'
+
+
+		}    
+
+    stage ('Cleanworkspace') {
+            cleanWs()
+	    sh '''#!/bin/bash 
+ 		echo "Inside cleanworkspace stage"
+	    '''
+        }
+   
+ }
+ 
+ }
+
+
+----------------------------------------------------------------------------------------------------------------
+https://jenkins-connected-exp.proterra.com:8443/view/2.%20DevLaunch-CD/job/DEV-LAUNCH-REPORTING-SERVICE-CD/4/replay/
+
+node{
+	cleanWs()
+stage('Clone repository') {
+ 
+ checkout scm
+ }
+stage('kubeconnect')
+{
+  sh '''
+kubectl config use-context arn:aws:eks:us-east-1:493000495847:cluster/proterra-mdc-eks-cluster
+kubectl apply -f /var/lib/jenkins/workspace/DEV-LAUNCH-REPORTING-SERVICE-CD/kubernetes/dev_launch.yml
+kubectl rollout restart deployment/reporting-service1 -n dev-mdc-launch2020
+sleep 40s
+kubectl logs deployment/reporting-service1 --all-containers -n dev-mdc-launch2020
+'''
+}
+}
+
+----------------------------------------------------------------------------------------------------------------
+https://jenkins-connected-exp.proterra.com:8443/view/4.%20DevLaunch/job/EXP_DEV_LAUNCH2020_V2G_OCPP/195/replay/
+
+def myapp, repo
+node ('master') {
+ def jdk = tool name: 'jdk8'
+ env.JAVA_HOME = "${jdk}"
+ def GRADLE_HOME = tool name: 'gradle6', type: 'hudson.plugins.gradle.GradleInstallation'
+ withEnv(['registry=https://493000495847.dkr.ecr.us-east-1.amazonaws.com',
+ 'ECRCRED=ecr:us-east-1:AWS-ECR-Jenkins' , 'tag=v2g-abb-dev-launch2020'
+ ]) {
+
+ stage('Clone repository') {
+ checkout scm
+ }
+ 
+	stage('Build') {
+	catchError {
+		sh '$JAVA_HOME/bin/java -version'
+		sh "${GRADLE_HOME}/bin/gradle fatJar" 
+	}
+	}
+  /* 	stage('Image') {
+	catchError {
+		repo = "proterra-ocpp-v2g"
+        myapp = docker.build(repo,".")
+	}
+ 	}
+stage('Push'){
+   catchError {
+    env.GIT_COMMIT = sh(script: "git rev-parse HEAD", returnStdout: true).trim()
+    sh '''aws ecr get-login-password --region us-east-1 | docker login --username AWS --password-stdin 493000495847.dkr.ecr.us-east-1.amazonaws.com '''
+    docker.withRegistry(registry + "/" + repo, ECRCRED) {
+    myapp.push("$tag" + "_" + env.GIT_COMMIT.take(7))
+    myapp.push("$tag" + "_" + env.BUILD_NUMBER)
+    myapp.push("$tag" + "_" + "latest")
+	myapp.push("$tag")
+  }
+ }
+ }*/
+ 
+stage('Rename and Copy JAR') {
+    catchError {
+        // Define source and destination paths
+        def sourceJar = "build/libs/Toucan-ocpp-all.jar"
+        def destinationDir = "/var/lib/jenkins/ocpp-builds"
+        def renamedJar = "Toucan-v2g-ocpp-all.jar"
+        
+        // Rename the JAR file
+        sh "cp ${sourceJar} ${destinationDir}/${renamedJar}"
+        
+        // Optionally, you can verify if the file exists after renaming
+        sh "ls ${destinationDir}/${renamedJar}"
+    }
+}
+ stage('Image') {
+  catchError {
+  sh "docker build -t v2g-abb-dev-launch2020 -f Dockerfile ."
+  sh "docker tag v2g-abb-dev-launch2020 493000495847.dkr.ecr.us-east-1.amazonaws.com/proterra-ocpp-v2g:v2g-abb-dev-launch2020"
+ }
+ }
+ 
+ stage('Push image') {
+  catchError {
+ sh '''aws ecr get-login-password --region us-east-1 | docker login --username AWS --password-stdin 493000495847.dkr.ecr.us-east-1.amazonaws.com '''
+ sh "docker push 493000495847.dkr.ecr.us-east-1.amazonaws.com/proterra-ocpp-v2g:v2g-abb-dev-launch2020"
+  
+ }
+ }
+ 
+ 
+    stage('Rancher Deploy') {
+    catchError {
+ sh '''
+kubectl config use-context arn:aws:eks:us-east-1:493000495847:cluster/proterra-mdc-eks-cluster
+kubectl rollout restart deployment/exp-v2g-abb-dev-launch2020 -n dev-mdc-launch2020
+sleep 40s
+kubectl logs deployment/exp-v2g-abb-dev-launch2020 --all-containers -n dev-mdc-launch2020
+'''
+//rancherRedeploy alwaysPull: true, credential: 'Rancher-Dev', images: '493000495847.dkr.ecr.us-east-1.amazonaws.com/proterra-ocpp-v2g:v2g-abb-dev-launch2020', workload: '/project/c-m-5btn5xmf:p-m9m5k/workload/deployment:dev-mdc-launch2020:exp-v2g-abb-dev-launch2020'
+ }
+ }
+ 
+ stage('Email Log') {
+
+sh 'rm -rf *.txt'
+
+sh "cat /var/lib/jenkins/jobs/${env.JOB_NAME}/builds/${env.BUILD_NUMBER}/log >> ${env.JOB_NAME}_${env.BUILD_NUMBER}_logs.txt"
+
+}	
+ stage ('Send Email') {
+	
+
+archiveArtifacts artifacts: '*.txt', onlyIfSuccessful: true
+//Please find the attached console output of branch commit Number ${GIT_COMMIT_REV} #${gitCommit}
+
+emailext to: "$postbuild_email_address",
+
+subject: "${env.JOB_NAME}#${env.BUILD_NUMBER} Build:${currentBuild.currentResult} ",
+
+body: """
+ <p>Hi Team,
+       
+	   Build for ${env.JOB_NAME}#${env.BUILD_NUMBER} is ${currentBuild.currentResult}.
+	   You can find the console output at <a href='${env.BUILD_URL}'>${env.JOB_NAME} #${env.BUILD_NUMBER}</a>. Also attaching the same for reference.
+	   
+    Regards
+    DevOps Team</p>
+                       """,
+
+
+
+attachmentsPattern: '*.txt'  
+
+
+ }
+ }
+ 
+ }
+
+----------------------------------------------------------------------------------------------------------------
+https://jenkins-connected.proterra.com:8443/view/DEVOPS/job/S3_Glacieredfiles_Restoration_Parameterized/configure
+
+node{
+	cleanWs()
+stage('S3filesrestore')
+{
+ sh """
+                    ssh -i /var/lib/jenkins/pem/prod1.pem ec2-user@54.91.218.120 <<EOF
+                   
+                     
+                    set -x
+
+                    echo "START RESTORE"
+                    
+                    pwd
+                    date
+                    whoami
+                    echo $S3_Bucket_Name
+                    echo $bus_type
+                    echo $start_date
+                    echo $end_date
+                    echo $vin
+                    
+                    cd /home/ec2-user/$S3_Bucket_Name
+                    
+                    ls -la
+                    
+                    ./restore_script.sh --bus-type=$bus_type --vin=$vin --start_date=$start_date --end_date=$end_date
+                    
+
+                    
+                    echo "============== Done ============="
+                    """
+}
+}
+----------------------------------------------------------------------------------------------------------------
+https://jenkins-connected.proterra.com:8443/view/DEVOPS/job/production-list-pods-using-pod-ips/12/console
+
+pipeline {
+    agent any
+
+    parameters {
+        //string(name: 'podIPs', defaultValue: '', description: 'Enter multiple pod IPs separated by newline')
+        text(name: 'podIPs', defaultValue: '', description: 'Enter pod IPs, each IP on a new line')
+    }
+
+    stages {
+        stage('List Pod Names') {
+            steps {
+                script {
+                    def podIPs = params.podIPs.split('\n')
+                    def podNames = []
+                    
+                    sh "kubectl config use-context arn:aws:eks:us-east-1:029126476216:cluster/prod2-eks-cluster"
+                    
+                    catchError {
+
+                    podIPs.each { ip ->
+                        def podName = sh(script: "kubectl get pods --all-namespaces --field-selector=status.podIP=${ip} -o name", returnStdout: true).trim()
+                        podNames.add(podName)
+                    }
+                    }
+
+                    echo "Pod Names: ${podNames.join('\n')}"
+                }
+            }
+        }
+    }
+}
+
+
+
+----------------------------------------------------------------------------------------------------------------
+https://jenkins-connected.proterra.com:8443/view/DEVOPS/job/PREPROD-RANCHER-ALL-SERVICES-UP/1/replay/
+
+node{
+	cleanWs()
+stage('kubeconnect')
+{
+ sh '''
+kubectl config use-context arn:aws:eks:us-east-1:029126476216:cluster/prod1-eks-cluster
+kubectl scale --replicas=1 deployment bus-fault-ingestor -n apex-workers
+kubectl scale --replicas=10 deployment bus-shadow-ingestor -n apex-workers
+kubectl scale --replicas=1 deployment datalake-cache-jobs  -n apex-workers
+kubectl scale --replicas=1 deployment ocpp-agg-worker -n apex-workers
+kubectl scale --replicas=4 deployment ocpp-ingestor-legacy  -n apex-workers
+kubectl scale --replicas=4 deployment ocpp-ingestor-prod -n apex-workers
+kubectl scale --replicas=1 deployment pcan-critical-worker -n apex-workers
+kubectl scale --replicas=1 deployment pcan-customagg-worker -n apex-workers
+kubectl scale --replicas=1 deployment pcan-noncritical-worker -n apex-workers
+kubectl scale --replicas=1 deployment toucan-fault-ingestor -n apex-workers
+kubectl scale --replicas=1 deployment abb-ocpp -n apis-internal
+kubectl scale --replicas=1 deployment ams-jobs -n apis-internal
+kubectl scale --replicas=1 deployment apex-rule-engine  -n apis-internal
+kubectl scale --replicas=1 deployment cim-jobs -n apis-internal
+kubectl scale --replicas=1 deployment internal-datalake -n apis-internal
+kubectl scale --replicas=1 deployment multiplexer  -n apis-internal
+kubectl scale --replicas=1 deployment ams -n apis
+kubectl scale --replicas=1 deployment bus-monitor -n apis
+kubectl scale --replicas=1 deployment business-tier  -n apis
+kubectl scale --replicas=1 deployment ccss-cim  -n apis
+kubectl scale --replicas=1 deployment ccss-iq -n apis
+kubectl scale --replicas=1 deployment ccss-manager  -n apis
+kubectl scale --replicas=1 deployment ccss-track  -n apis
+kubectl scale --replicas=3 deployment charger-fault-processor -n apis
+kubectl scale --replicas=1 deployment charger-manager-v1 -n apis
+kubectl scale --replicas=1 deployment charger-optimizer-v1-and-dmc -n apis
+kubectl scale --replicas=1 deployment datalake -n apis
+kubectl scale --replicas=1 deployment dmc-schedule  -n apis
+kubectl scale --replicas=1 deployment fault-apis   -n apis
+kubectl scale --replicas=1 deployment geoprogram -n apis
+kubectl scale --replicas=1 deployment multiplexer-cp -n apis
+kubectl scale --replicas=1 deployment notifications -n apis
+kubectl scale --replicas=1 deployment prod1-fault-dashboard-service -n apis
+kubectl scale --replicas=1 deployment reporting-service -n apis
+kubectl scale --replicas=1 deployment scmt -n apis
+kubectl scale --replicas=1 deployment sse-event-service -n apis
+kubectl scale --replicas=1 deployment v2g-backend  -n apis
+kubectl scale --replicas=1 deployment v2g-openadr-adapter -n apis
+kubectl scale --replicas=1 deployment v2g-webservice  -n apis
+kubectl scale --replicas=1 deployment vehicle-fault-processor -n apis
+kubectl scale --replicas=1 deployment vehicle-mender-updates -n apis
+kubectl scale --replicas=1 deployment activity-log-manager -n dlms
+kubectl scale --replicas=1 deployment certificate-service -n dlms
+kubectl scale --replicas=1 deployment device-service   -n dlms
+kubectl scale --replicas=1 deployment ocpp-logstash  -n logstash
+kubectl scale --replicas=2 deployment pcan-logstash -n logstash
+'''
+}
+}
+
+----------------------------------------------------------------------------------------------------------------
+https://jenkins-connected.proterra.com:8443/view/DEVOPS/job/TAGGING-REPOS/
+
+#!/bin/sh
+
+branch=${branch}
+tagname=${tagname}
+array=$(awk -F= '{print $1}' $WORKSPACE/TAGGING_REPO.list)
+mkdir -p gitrepos_$(date +%F) && cd gitrepos_$(date +%F)
+
+
+for element in ${array}
+do
+  echo "clonning $element"
+  git clone git@github.com:proterra-inc/$element.git --config core.sshCommand="ssh -i /var/lib/jenkins/.ssh/id_rsa_github"
+  basename=$(basename $element)
+  foldername=${basename%.*}
+  cd $foldername
+  git checkout $branch
+  git pull
+  git tag $tagname
+  git push -u origin $tagname
+  cd ../
+done
+
+
+----------------------------------------------------------------------------------------------------------------
+https://jenkins-connected.proterra.com:8443/view/PROD1/job/PROD1-APEX-UI/171/replay/
+
+pipeline {
+  agent any
+
+  tools {nodejs "node10"}
+
+  stages {
+    stage('Userinterface') {
+      steps {
+        sh '''#!/bin/bash +x
+        cd assetmgmt-ui
+        npm install
+	npm update
+	bower install boostrap-sass --save
+        bower install
+        npm rebuild node-sass
+        
+
+        rm -rf dist.zip
+        
+        node_modules/gulp/bin/gulp.js serve:build_env --env=prod1
+        version_number=`date +%m.%d.%y`
+        echo $version_number
+        find dist/ -type f -exec sed -i -e 's/__BUILD__VERSION__/'$version_number'/g' {} +
+        cp -r dist prod
+        mv prod dist
+        sed -i -e 's/,this.$ENV[6]/',this.$ENV[2]'/g' dist/prod/scripts/main.js
+        aws s3 rm s3://prod1-apex.proterra.com --recursive
+        #aws s3 sync dist/ s3://prod1-apex.proterra.com --acl public-read
+	aws s3 cp dist/ s3://prod1-apex.proterra.com  --recursive --acl bucket-owner-full-control
+        '''
+      }
+    }
+  }
+}
+
+----------------------------------------------------------------------------------------------------------------
+https://jenkins-connected.proterra.com:8443/view/PROD1/job/PROD1-APEX-UI-CACHE-INVALIDATE/22/replay/
+
+import groovy.json.JsonSlurper
+pipeline {
+    agent any
+    
+    environment {
+        //AWS_DEFAULT_REGION = 'us-east-1'
+        ROLE_ARN = 'arn:aws:iam::029126476216:role/cross-account-jenkins'
+        SESSION_NAME = 'CrossAccount'
+        OUTPUT_FORMAT = 'json'
+    }
+
+    stages {
+
+        stage('Assume Role and Get Temporary Credentials') {
+            steps {
+                script {
+                    def assumeRoleOutput = sh (
+                        script: "aws sts assume-role --role-arn ${ROLE_ARN} --role-session-name ${SESSION_NAME} --output ${OUTPUT_FORMAT}",
+                        returnStdout: true
+                    ).trim()
+
+                    def jsonSlurper = new JsonSlurper()
+                    def assumeRoleJson = jsonSlurper.parseText(assumeRoleOutput)
+
+                    // Extract temporary credentials
+                    def accessKeyId = assumeRoleJson.Credentials.AccessKeyId
+                    def secretAccessKey = assumeRoleJson.Credentials.SecretAccessKey
+                    def sessionToken = assumeRoleJson.Credentials.SessionToken
+
+                    // Save the temporary credentials to environment variables
+                    env.AWS_ACCESS_KEY_ID = accessKeyId
+                    env.AWS_SECRET_ACCESS_KEY = secretAccessKey
+                    env.AWS_SESSION_TOKEN = sessionToken
+                }
+            }
+        }
+
+
+
+        stage('Invalidate Cache') {
+            steps {
+                script {
+                    def invalidationBatch = '{"Paths":{"Quantity":1,"Items":["/*"]},"CallerReference":"jenkins-pipeline-' + UUID.randomUUID().toString() + '"}'
+                    def command = "aws cloudfront create-invalidation --distribution-id EU8JS6CCXJH27 --invalidation-batch '${invalidationBatch}'"
+                    //def command = "aws cloudfront create-invalidation --distribution-id E2RCCZ0NOVO6EU --paths "/*""
+                    
+                    sh "export AWS_ACCESS_KEY_ID=${env.AWS_ACCESS_KEY_ID}"
+                    sh "export AWS_SECRET_ACCESS_KEY=${env.AWS_SECRET_ACCESS_KEY}"
+                    sh "export AWS_SESSION_TOKEN=${env.AWS_SESSION_TOKEN}"
+                    //sh "export AWS_DEFAULT_REGION=${AWS_DEFAULT_REGION}"
+                    
+
+                    sh command
+
+                }
+            }
+        }
+    }
+}
+
+----------------------------------------------------------------------------------------------------------------
+https://jenkins-connected-exp.proterra.com:8443/view/4.%20DevLaunch/job/EXP_DEV_LAUNCH2020_OCPP_NON_ABB_PCS-BUILD_and_DEPLOY/configure
+
+#gradle fatJar 
+echo "Jar is saved successfully"
+ls -l ${WORKSPACE}/build/libs/Toucan-ocpp-all.jar 
+cp ${WORKSPACE}/build/libs/Toucan-ocpp-all.jar /var/lib/jenkins/ocpp-builds/
+
+echo "Build  is completed" 
+
+# Description: copy jar file to OCPP server & restart ocpp service.
+#SOURCE_JAR="${WORKSPACE}/build/libs/Toucan-ocpp-all.jar"
+SOURCE_JAR="/var/lib/jenkins/ocpp-builds/Toucan-ocpp-all.jar"
+# DEV Ec2 OCPP non abb PCS server
+TARGET_SERVER=52.73.17.209
+#TARGET_SERVER=172.31.8.92
+TARGET_PEM_PATH="/var/lib/jenkins/pem/ocpp-exp.pem"
+echo "Copying Jar & depoy scripts to Target server"
+if [ ! -f ${SOURCE_JAR} ]
+then
+	echo "Required jar file does not exists in ${SOURCE_JAR} . Deployment not yet happened.Please check"
+	exit
+fi	
+
+scp -i  ${TARGET_PEM_PATH} ${SOURCE_JAR} ec2-user@${TARGET_SERVER}:/tmp
+#ssh -i ${TARGET_PEM_PATH} ec2-user@${TARGET_SERVER}:/home/ec2-user/deploy.sh
+ssh -i /var/lib/jenkins/pem/ocpp-exp.pem ec2-user@52.73.17.209 /home/ec2-user/deploy.sh
+ssh -i /var/lib/jenkins/pem/ocpp-exp.pem ec2-user@52.73.17.209 /home/ec2-user/restart.sh
+sleep 40
+ssh -i /var/lib/jenkins/pem/ocpp-exp.pem ec2-user@52.73.17.209 netstat -lntp
+ssh -i /var/lib/jenkins/pem/ocpp-exp.pem ec2-user@52.73.17.209 tail -100 /mnt/hd1/log/ocpp/ocpp.log
+echo "======== Deployment is completed========"
+
+echo "============== Done ============="
+----------------------------------------------------------------------------------------------------------------
+https://jenkins-connected.proterra.com:8443/view/PROD1/job/PROD1-CCSS-UI/configure
+
+#!/bin/bash +x
+npm install
+npm install --global @angular/cli@8.3.22
+npm install pdfmake --save
+ng build --configuration=prod1	
+export S3_TARGET="s3://prod1-ccss-ecms.connected.proterra.com"
+export S3_SOURCE="$WORKSPACE/dist/Proterra-Edmonton"
+aws s3 cp $S3_SOURCE $S3_TARGET/ --recursive --acl bucket-owner-full-control
+----------------------------------------------------------------------------------------------------------------
+https://jenkins-connected.proterra.com:8443/view/PROD1/job/PROD1-CP-UI/23/replay/
+
+pipeline {
+  agent any
+
+  tools {nodejs "node10"}
+
+  stages {
+    stage('multiplexer_cp_ui') {
+      steps {
+        sh '''#!/bin/bash +x
+        cp ${WORKSPACE}/src/environments/environment.prod1.ts ${WORKSPACE}/src/environments/environment.ts
+        #npm install -g @angular/cli
+        npm install -g @angular/cli@8.3.22
+        #ng update --next @angular/cli --force
+        #npm install typescript@latest
+        ng update
+        npx browserslist@latest --update-db 
+        #npm update
+        ng build
+       
+        ng build
+        export S3_TARGET="s3://prod1-multiplexer-cp.apex.proterra.com"
+        export S3_SOURCE="$WORKSPACE/dist/Proterra"
+        aws s3 cp $S3_SOURCE $S3_TARGET/ --recursive --acl public-read
+        '''
+      }
+    }
+  }
+}
+
+----------------------------------------------------------------------------------------------------------------
+https://jenkins-connected.proterra.com:8443/view/PROD1/job/PROD1_APEX_ESUPGRADE_LIB/configure
+
+-B -X -Dmaven.test.skip=true clean install
+----------------------------------------------------------------------------------------------------------------
+https://jenkins-connected.proterra.com:8443/view/PROD1/job/PROD1-RBAC-LIB/configure
+
+clean install
+
+----------------------------------------------------------------------------------------------------------------
+https://jenkins-connected-exp.proterra.com:8443/view/DEVOPS/job/pick-file-from-local/configure
+
+pwd
+ls | grep index.html
+
+aws s3 sync $WORKSPACE/ s3://dev-opensearch-apex.proterra.com
+aws cloudfront create-invalidation --distribution-id E3U357BEHVO229 --paths "/*"
+----------------------------------------------------------------------------------------------------------------
+https://jenkins-connected-exp.proterra.com:8443/view/DEVOPS/job/GIT-PUSH-TO-S3/configure
+
+Schedule:
+H 7 * * *
+
+Script:
+whoami
+cp -r  /var/lib/jenkins/GIT_BACKUP.list $WORKSPACE/GIT_BACKUP_$(date +%F).list
+cat GIT_BACKUP_$(date +%F).list
+array=$(awk -F= '{print $1}' GIT_BACKUP_$(date +%F).list)
+rm -rf gitrepos_$(date +%F)
+mkdir -p gitrepos_$(date +%F) && cd gitrepos_$(date +%F)
+for element in ${array}
+do
+  echo "clonning ${element}"
+  #ssh-agent $(ssh-add /var/lib/jenkins/.ssh/id_rsa_spotnuru; git clone git@github.com:proterra-inc/$element.git)
+  git clone git@github.com:proterra-inc/$element.git  --config core.sshCommand="ssh -i /var/lib/jenkins/.ssh/id_rsa_spotnuru_latest"
+ 
+done
+cd ..
+tar -czvf $WORKSPACE/gitbackup_$(date +%F)_$BUILD_NUMBER.tar.gz $WORKSPACE/gitrepos_$(date +%F)/
+aws s3 cp $WORKSPACE/gitbackup_$(date +%F)_$BUILD_NUMBER.tar.gz s3://exp-git-backup
+
+
+
+----------------------------------------------------------------------------------------------------------------
+https://jenkins-connected-exp.proterra.com:8443/view/DEVOPS/job/mdc-slave-start/configure
+
+TARGET_SERVER=172.30.0.8
+TARGET_PEM_PATH="/var/lib/jenkins/pem/exp-jenkins.pem"
+echo "Starting MDC SLAVE"
+
+#ssh -i ${TARGET_PEM_PATH}  -o StrictHostKeyChecking=no ubuntu@${TARGET_SERVER}  <<EOF
+ssh -i /var/lib/jenkins/pem/exp-jenkins.pem ubuntu@172.30.0.8 <<EOF
+#!/bin/bash 
+set -x
+
+echo "START SLAVE"
+cd /home/
+sleep 5s
+java -jar agent.jar -jnlpUrl https://jenkins-connected-exp.proterra.com:8443/computer/MDCSLAVE/jenkins-agent.jnlp -secret 79db80be7f8581a64f648d414fdcb2380d6f806250d05466617cd50bd0716d2c -workDir "/var/lib/jenkins" > /dev/null &
+EOF
+
+echo "============== Done ============="
+----------------------------------------------------------------------------------------------------------------
+https://jenkins-connected-exp.proterra.com:8443/view/DEVOPS/job/DEVOPS-SAST-REPORT-RUN-ON-DEMAND/configure
+
+pipeline {
+	agent any
+	stages {
+	    
+		stage('SAST') {
+			steps {
+				script{
+				    
+					//To read file from workspace which will contain the Jenkins Job Name ###
+					sh "date=`date +%F`"
+				//	echo "Date is $date"
+				def now = new Date()
+                today_date=now.format("yyyy-MM-dd", TimeZone.getTimeZone('UTC'))
+                //println "Today is ${today_date}"
+                
+              
+                
+                    read_file= "/var/lib/jenkins/jobs/DEVOPS/Valence_Developers_Latest_Commits_Repo_List_" + today_date + ".list"
+                    // read_file= "/var/lib/jenkins/jobs/DEVOPS/Valence_Developers_Repoval.list"
+                    
+					def filePath = readFile "${read_file}"
+
+					//To read file line by line ###
+					def lines = filePath.readLines() 
+		  
+						//To iterate and run Jenkins Jobs one by one ####
+						for (line in lines) {    
+								//println "${line}"
+								
+								
+                                 stage('SCM') {
+                                     cleanWs()
+                                     def jdk = tool name: 'java11'
+                                  env.JAVA_HOME = "${jdk}"
+                                  git branch: "$branch_name", credentialsId: 'spandanapotnuru', url: "git@github.com:proterra-inc/${line}.git"
+                                  }				            
+	 
+								stage('SonarQube analysis') {
+									
+										  echo "Repository is ${line}"  
+										    if ((line == 'dlms-device-service') || (line == 'reporting-service') || (line =='dlms-certificate-service')  ||  (line =='activity-log-manager')  ||  (line =='apex_business_tier') ||  (line =='bus-monitor') ||  (line =='ccss-ecms-ui') ||  (line =='ccss-manager') ||  (line =='chargemgmt') ||  (line =='customer-cloud-integration') ||  (line =='dnp3') ||  (line =='fault-dashboard-service') ||  (line =='incoming-queue') ||  (line =='multiplexer') ||  (line =='multiplexer-control-panel') ||  (line =='multiplexer_cp_ui') ||  (line =='reporting-service') ||  (line =='sse-event-service') ||  (line =='v2g-backend') ||  (line =='v2g-webservices') ||  (line =='vehicle-fault-processor')  ||  (line =='admin-service') ||  (line =='alerts-config-service') ||  (line =='apex-esupgrade-lib') ||  (line =='apex-rule-engine') ||  (line =='charger-fault-processor') ||  (line =='fault-lib') ||  (line =='notifications') ||  (line =='openadr-adapter') ||  (line =='scmt-cloner') ||  (line =='vehicle_mender_updates') ||  (line =='elastic-search-util') ||  (line =='rbac-lib')) {
+                                                        def scannerHome = tool 'SonarQube';
+                    									withSonarQubeEnv(branch: "$branch_name",credentialsId: 'devopsdemo'){ 
+                    										catchError {
+                    											sh "${scannerHome}/bin/sonar-scanner \
+                    											-D sonar.projectKey=DEVOPS-${line}-${branch_name} \
+                    											-D sonar.java.source=11 \
+                    											-D sonar.java.binaries=src/main \
+                    											-D sonar.host.url=https://sonarqube-cicd.proterra.com"
+                    													 
+                    									}
+                    								}
+                                            }  
+                                            else if ((line == 'insights')|| (line == 'Proterra-OCPP4') || (line == 'apex-datasystem-headers') || (line == 'apex-tabs') || (line =='charger-fault-api')  ||  (line =='Charger-Simulator')  ||  (line =='commissioning') ||  (line =='Userinterface') ||  (line =='valence_utilities') )  {
+                                                		def scannerHome = tool 'SonarQube';
+                    									withSonarQubeEnv(branch: "$branch_name",credentialsId: 'devopsdemo'){ 
+                    										catchError {
+                    											sh "${scannerHome}/bin/sonar-scanner \
+                    											-D sonar.projectKey=DEVOPS-${line}-${branch_name} \
+                    											-D sonar.java.source=11 \
+                    											-D sonar.java.binaries=* \
+                    											-D sonar.host.url=https://sonarqube-cicd.proterra.com"
+													 
+									}
+								}
+                                                
+                                                
+                                            }
+                                            
+                                            
+                                            
+                                            else {
+                                                		def scannerHome = tool 'SonarQube';
+                    									withSonarQubeEnv(branch: "$branch_name",credentialsId: 'devopsdemo'){ 
+                    										catchError {
+                    											sh "${scannerHome}/bin/sonar-scanner \
+                    											-D sonar.projectKey=DEVOPS-${line}-${branch_name} \
+                    											-D sonar.java.source=11 \
+                    											-D sonar.java.binaries=*/src/main \
+                    											-D sonar.host.url=https://sonarqube-cicd.proterra.com"
+													 
+									}
+								}
+                                                
+                                                
+                                            }
+										 
+								}	
+						} 
+						
+						stage ('Email-Notification') {
+                    //	archiveArtifacts artifacts: '*.txt', onlyIfSuccessful: true
+                    	emailext to: "$postbuild_email_address",
+                    	subject: "SAST Report Generated-${BUILD_TIMESTAMP}",
+                    	body: """
+Hi Team,
+	   
+Sonarqube analysis is done for today on branch  "$branch_name".SAST report runs on a daily basis for the repos where there are commits.
+Results are avaialble in Sonardashboard (https://sonarqube-cicd.proterra.com/) with naming convention DEVOPS-<RepoName>-<BranchName>.
+Today's scan is completed on repo's 
+${filePath}
+
+Regards
+DevOps Team
+                    		 """
+                    		//,attachmentsPattern: '*.txt'
+
+                            }   
+                }
+                    
+			}
+		}
+    }
+}
+
+----------------------------------------------------------------------------------------------------------------
+https://jenkins-connected-exp.proterra.com:8443/view/DEVOPS/job/QA-OPENSEARCH-NODE-POD-METRICS/configure
+
+node{
+	cleanWs()
+stage('kubeconnect')
+{
+ sh '''
+kubectl config use-context arn:aws:eks:us-east-1:493000495847:cluster/qa2-eks-cluster
+kubectl top nodes
+sleep 10s
+kubectl top node ip-10-109-118-103.ec2.internal
+sleep 10s
+kubectl describe nodes
+sleep 10s
+kubectl top pod --all-namespaces
+
+kubectl config use-context arn:aws:eks:us-east-1:493000495847:cluster/qa2-eks-cluster
+sleep 10s
+ kubectl top nodes
+ sleep 10s
+kubectl top node ip-10-109-118-103.ec2.internal
+sleep 10s
+kubectl describe node ip-10-109-118-103.ec2.internal
+ sleep 10s
+ echo ip-10-109-118-103.ec2.internal  | xargs bash -c 'kubectl get pod -A -o wide | grep $0'| awk {'print $1 " " $2'} | xargs -l bash -c 'kubectl top pods -n $0 $1 --use-protocol-buffers --no-headers'
+
+'''
+}
+
+stage('Email Log') {
+sh 'rm -rf *.txt'
+sh "cat /var/lib/jenkins/jobs/${env.JOB_NAME}/builds/${env.BUILD_NUMBER}/log >> ${env.JOB_NAME}_${env.BUILD_NUMBER}_logs.txt"
+				}    
+stage ('Send Email') {
+archiveArtifacts artifacts: '*.txt', onlyIfSuccessful: true
+//Please find the attached console output of branch commit Number ${GIT_COMMIT_REV} #${gitCommit}
+emailext to: "vreddy@proterra.com, spotnuru@proterra.com",
+subject: "QA-OPENSEARCH-NODE-POD-METRICS",
+body: """
+<p>Hi Team,
+       
+       Please find the attached report for QA Opensearch EKS metrics
+    Regards
+    DevOps Team</p>
+     """,
+attachmentsPattern: '*.txt'
+        }    
+}
+----------------------------------------------------------------------------------------------------------------
+https://jenkins-connected-exp.proterra.com:8443/view/DEVOPS/job/DEVOPS-CODECOV-REPORT-RUN-ON-DEMAND/15/replay/
+
+pipeline {
+	agent any
+	stages {
+	    
+		stage('SAST') {
+			steps {
+				script{
+				    
+					//To read file from workspace which will contain the Jenkins Job Name ###
+					sh "date=`date +%F`"
+				//	echo "Date is $date"
+				def now = new Date()
+                today_date=now.format("yyyy-MM-dd", TimeZone.getTimeZone('UTC'))
+                //println "Today is ${today_date}"
+                
+              
+                //read_file= "/var/lib/jenkins/jobs/DEVOPS/Valence_CodeCoverage_Repo.list"
+                   // read_file= "/var/lib/jenkins/jobs/DEVOPS/Valence_Developers_Latest_Commits_Repo_List_" + today_date + ".list"
+                      read_file= "/home/ubuntu/sastrepo1.list"
+                    
+					def filePath = readFile "${read_file}"
+
+					//To read file line by line ###
+					def lines = filePath.readLines() 
+		  
+						//To iterate and run Jenkins Jobs one by one ####
+						for (line in lines) {    
+								//println "${line}"
+								
+								
+                                 stage('SCM') {
+                                     cleanWs()
+                                     def jdk = tool name: 'java11'
+                                  env.JAVA_HOME = "${jdk}"
+                                  git branch: "$branch_name", credentialsId: 'spandanapotnuru', url: "git@github.com:proterra-inc/${line}.git"
+                                  }	
+
+							//	stage('Clone repository') {
+							//		 
+							//		 checkout scm
+							//	}
+									 
+								stage('read POM versions') {
+									 app = readMavenPom().getArtifactId()
+									 ver = readMavenPom().getVersion()
+									 echo "APP NAME: ${app}"
+									 echo "VERSION: ${ver}"
+								 }								
+								 
+								 
+								 stage('Build') {
+									catchError {
+										 withMaven(maven: 'Maven 3') {
+										 sh '''#!/bin/bash 
+										 echo "Maven Clean install with test cases..."
+										 mvn -B -X -Dmaven.test.skip=false -Dmaven.test.failure.ignore=true clean verify
+										 '''
+											}
+									}
+								}
+								
+								
+								
+
+
+
+
+								  
+	 
+								stage('SonarQube analysis') {
+									
+										  echo "Repository is ${line}"  
+										    if ((line == 'dlms-device-service') || (line == 'reporting-service') || (line =='dlms-certificate-service')  ||  (line =='activity-log-manager')  ||  (line =='apex_business_tier') ||  (line =='bus-monitor') ||  (line =='ccss-ecms-ui') ||  (line =='ccss-manager') ||  (line =='chargemgmt') ||  (line =='customer-cloud-integration') ||  (line =='dnp3') ||  (line =='fault-dashboard-service') ||  (line =='incoming-queue') ||  (line =='multiplexer') ||  (line =='multiplexer-control-panel') ||  (line =='multiplexer_cp_ui') ||  (line =='reporting-service') ||  (line =='sse-event-service') ||  (line =='v2g-backend') ||  (line =='v2g-webservices') ||  (line =='vehicle-fault-processor')  ||  (line =='admin-service') ||  (line =='alerts-config-service') ||  (line =='apex-esupgrade-lib') ||  (line =='apex-rule-engine') ||  (line =='charger-fault-processor') ||  (line =='fault-lib') ||  (line =='notifications') ||  (line =='openadr-adapter') ||  (line =='scmt-cloner') ||  (line =='vehicle_mender_updates') ||  (line =='elastic-search-util') ||  (line =='rbac-lib')) {
+                                                        def scannerHome = tool 'SonarQube';
+                    									withSonarQubeEnv(branch: "$branch_name",credentialsId: 'devopsdemo'){ 
+                    										catchError {
+                    											sh "${scannerHome}/bin/sonar-scanner \
+                    											-D sonar.projectKey=DEVOPS-CODECOVERAGE-${line}-${branch_name} \
+                    											-D sonar.java.source=11 \
+                    											-D sonar.java.binaries=src/main \
+                    											-D sonar.host.url=https://sonarqube-cicd.proterra.com"
+                    													 
+                    									}
+                    								}
+                                            }  
+                                            else if ((line == 'insights')|| (line == 'Proterra-OCPP4') || (line == 'apex-datasystem-headers') || (line == 'apex-tabs') || (line =='charger-fault-api')  ||  (line =='Charger-Simulator')  ||  (line =='commissioning') ||  (line =='Userinterface') ||  (line =='valence_utilities') )  {
+                                                		def scannerHome = tool 'SonarQube';
+                    									withSonarQubeEnv(branch: "$branch_name",credentialsId: 'devopsdemo'){ 
+                    										catchError {
+                    											sh "${scannerHome}/bin/sonar-scanner \
+                    											-D sonar.projectKey=DEVOPS-CODECOVERAGE-${line}-${branch_name} \
+                    											-D sonar.java.source=11 \
+                    											-D sonar.java.binaries=* \
+                    											-D sonar.host.url=https://sonarqube-cicd.proterra.com"
+													 
+									}
+								}
+                                                
+                                                
+                                            }
+                                            
+                                            
+                                            
+                                            else {
+                                                		def scannerHome = tool 'SonarQube';
+                    									withSonarQubeEnv(branch: "$branch_name",credentialsId: 'devopsdemo'){ 
+                    										catchError {
+                    											sh "${scannerHome}/bin/sonar-scanner \
+                    											-D sonar.projectKey=DEVOPS-CODECOVERAGE-${line}-${branch_name} \
+                    											-D sonar.java.source=11 \
+                    											-D sonar.java.binaries=*/src/main \
+                    											-D sonar.host.url=https://sonarqube-cicd.proterra.com"
+													 
+									}
+								}
+                                                
+                                                
+                                            }
+										 
+								}	
+						} 
+						
+						stage ('Email-Notification') {
+                    //	archiveArtifacts artifacts: '*.txt', onlyIfSuccessful: true
+                    	emailext to: "spotnuru@proterra.com",
+                    	subject: "SAST Report Generated-${BUILD_TIMESTAMP}",
+                    	body: """
+Hi Team,
+	   
+Sonarqube analysis along with code coverage is done for today on branch  "$branch_name".SAST report runs on a daily basis for the repos where there are commits.
+Results are avaialble in Sonardashboard (https://sonarqube-cicd.proterra.com/) with naming convention DEVOPS-<RepoName>-<BranchName>.
+Today's scan is completed on repo's 
+${filePath}
+
+Regards
+DevOps Team
+                    		 """
+                    		//,attachmentsPattern: '*.txt'
+
+                            }   
+                }
+                    
+			}
+		}
+    }
+}
+
+----------------------------------------------------------------------------------------------------------------
+https://jenkins-connected-exp.proterra.com:8443/view/DEVOPS/job/DEVOPS-SCA-REPORT-RUN-ON-DEMAND/116/replay/
+
+pipeline {
+	agent any
+	stages {
+	    
+		stage('Hello') {
+			steps {
+				script{
+				    
+					//To read file from workspace which will contain the Jenkins Job Name ###
+					sh "rm -rf /var/lib/jenkins/jobs/DEVOPS-SCA-REPORT-RUN-ON-DEMAND/*.html"
+					sh "rm -rf /var/lib/jenkins/jobs/DEVOPS-SCA-REPORT-RUN-ON-DEMAND/*.zip"
+					
+				//	echo "Date is $date"
+				def now = new Date()
+                today_date=now.format("yyyy-MM-dd", TimeZone.getTimeZone('UTC'))
+                //println "Today is ${today_date}"
+                
+                   read_file= "/var/lib/jenkins/jobs/DEVOPS/Valence_Developers_Latest_Commits_Repo_List_" + today_date + ".list"
+                 //read_file= "/var/lib/jenkins/jobs/DEVOPS/test.list"
+                    
+                    
+					def filePath = readFile "${read_file}"
+
+					//To read file line by line ###
+					def lines = filePath.readLines() 
+		  
+						//To iterate and run Jenkins Jobs one by one ####
+						for (line in lines) {    
+								//println "${line}"
+								
+								
+                                 stage('SCM') {
+                                     cleanWs()
+                                  git branch: "$branch_name", credentialsId: 'spandanapotnuru', url: "git@github.com:proterra-inc/${line}.git"
+                                  }				            
+	 
+								stage('SCA') {
+									
+										  echo "Repository is ${line}"  
+
+                    												 if ((line == 'MDC-EMM-UI') || (line == 'ccss-ecms-ui') || (line == 'commissioning') || (line == 'multiplexer_cp_ui')){
+										  
+										      catchError {
+                    										    sh 'rm ./package-lock.json'
+                    										  
+                    										    
+                    											dependencyCheck additionalArguments: ' --format HTML', odcInstallation: 'Default'
+           
+                                                                sh "sudo mv dependency-check-report.html /var/lib/jenkins/jobs/DEVOPS-SCA-REPORT-RUN-ON-DEMAND/DEVOPS-${line}-${branch_name}-dependency-check-report.html"
+                    													 
+                    									}
+										  }
+										  else if ((line == 'Userinterface')){
+										      
+										      
+
+                    										catchError {
+                    										    sh 'sudo rm -rf ./assetmgmt-ui/package-lock.json ./charger_commisioning/package-lock.json /var/lib/jenkins/workspace/DEVOPS-SCA-REPORT-RUN-ON-DEMAND/assetmgmt-ui/package-lock.json'
+                    										   
+                    										  //sh 'rm ./**/package-lock.json'
+                    											dependencyCheck additionalArguments: ' --format HTML', odcInstallation: 'Default'
+                    										    
+                    											/*dependencyCheck additionalArguments: ' --format HTML', odcInstallation: 'Default' */
+           
+                                                                sh "sudo mv dependency-check-report.html /var/lib/jenkins/jobs/DEVOPS-SCA-REPORT-RUN-ON-DEMAND/DEVOPS-${line}-${branch_name}-dependency-check-report.html"
+                    													 
+                    									}
+										  }
+										  else{
+										      
+										       catchError {
+                    										    
+                    										 
+                    										    
+                    											dependencyCheck additionalArguments: ' --format HTML', odcInstallation: 'Default'
+           
+                                                                sh "sudo mv dependency-check-report.html /var/lib/jenkins/jobs/DEVOPS-SCA-REPORT-RUN-ON-DEMAND/DEVOPS-${line}-${branch_name}-dependency-check-report.html"
+                    													 
+                    									}
+										  }
+														
+                    								
+                                        
+								}	
+								
+							stage ('Zip') {
+		 sh "zip /var/lib/jenkins/jobs/DEVOPS-SCA-REPORT-RUN-ON-DEMAND/SCA_REPORTS_${today_date}.zip /var/lib/jenkins/jobs/DEVOPS-SCA-REPORT-RUN-ON-DEMAND/DEVOPS-${line}-${branch_name}-dependency-check-report.html"
+}	
+							
+						}  
+						
+						
+    stage('Attch File') {
+sh '''
+export newd="$(date +'%m%d%y')"
+
+rm -rf *.zip
+
+cp /var/lib/jenkins/jobs/DEVOPS-SCA-REPORT-RUN-ON-DEMAND/SCA_REPORTS_*.zip SCA_REPORT_${newd}.zip
+
+'''
+
+
+}
+                        stage ('Email-Notification') {
+                    //	archiveArtifacts artifacts: '*.txt', onlyIfSuccessful: true
+                    //	emailext to: "$postbuild_email_address",
+                    	emailext to: "spotnuru@proterra.com",
+                    	subject: "SCA Report Generated-${BUILD_TIMESTAMP}",
+                    	body: """
+Hi Team,
+	   
+SCA analysis is done for today on branch  "$branch_name".SCA report runs on a daily basis for the repos where there are commits.
+Results are avaialble in attached zip file.
+Today's scan is completed on repo's 
+${filePath}
+
+Regards
+DevOps Team
+                    		 """,
+                    		 attachmentsPattern: '*.zip'
+
+                            }  
+						
+						
+                }
+                    
+			}
+		}
+    }
+}
+
+----------------------------------------------------------------------------------------------------------------
+https://jenkins-connected-exp.proterra.com:8443/view/DEVOPS/job/DEVOPS-REPO-LIST-PREPARATION-FOR-SCANS/configure
+
+#cat /var/lib/jenkins/jobs/DEVOPS/Valence_Developers_Repo.list
+array=$(awk -F= '{print $1}' /var/lib/jenkins/jobs/DEVOPS/Valence_Developers_Repo.list)
+#rm -rf gitrepos_$(date +%F)
+if [ -f "/var/lib/jenkins/jobs/DEVOPS/Valence_Developers_SAST_Report_$(date +%F).list" ]; then
+    sudo rm -rf /var/lib/jenkins/jobs/DEVOPS/Valence_Developers_Latest_Commits_Repo_List_$(date +%F).list
+fi
+if [ -d "$WORKSPACE/gitrepos_$(date +%F)" ]; then
+    sudo rm -rf $WORKSPACE/gitrepos_$(date +%F)
+fi
+
+sudo rm -rf /var/lib/jenkins/jobs/DEVOPS/Valence_Developers_Latest_Commits_Repo_List_$(date +%F).list
+#rm /var/lib/jenkins/jobs/Valence_Developers_SAST_Report_$(date +%F).list
+mkdir -p $WORKSPACE/gitrepos_$(date +%F) && cd $WORKSPACE/gitrepos_$(date +%F)
+for element in ${array}
+do
+  echo "clonning ${element}"
+  git clone git@github.com:proterra-inc/$element.git
+  cd $WORKSPACE/gitrepos_$(date +%F)/$element
+  git checkout $branch_name
+  commit_exists=`git log --since="1 day ago"`
+
+  if [ -n "$commit_exists" ]; then 
+    echo "${element}" >> /var/lib/jenkins/jobs/DEVOPS/Valence_Developers_Latest_Commits_Repo_List_$(date +%F).list
+ fi
+ cd $WORKSPACE/gitrepos_$(date +%F)
+done
+
+
+
+----------------------------------------------------------------------------------------------------------------
+----------------------------------------------------------------------------------------------------------------
+----------------------------------------------------------------------------------------------------------------
+----------------------------------------------------------------------------------------------------------------
