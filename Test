@@ -1,3 +1,5 @@
+cf apps | for /f "tokens=1" %A in ('findstr /r "^[A-Za-z]"') do @echo %A >> test.txt
+
 To add these parameters in a Jenkins job using the **"Add Parameters"** feature, you can follow these steps:
 
 ### 1. Adding Platform Parameters:
