@@ -51,4 +51,6 @@ To add these parameters in a Jenkins job using the **"Add Parameters"** feature,
 
 ### Optional: Cascading Parameters
 If you want to have the second dropdown (version) dependent on the first dropdown (OS/Browser), Jenkins doesn’t support this natively. You can achieve cascading dropdowns with the **"Active Choices"** plugin, which allows dynamic parameters based on the selection of previous ones. This would require scripting within the parameter configuration.
+new:
 
+implementation 'com.google.guava:guava:32.1.1-jre'
