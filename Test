@@ -1,3 +1,36 @@
+pipeline {
+    agent any
+    stages {
+        stage('Initialize Logger') {
+            steps {
+                script {
+                    // Import the logger library
+                    import java.util.logging.Logger
+                    
+                    // Create a logger object
+                    def logger = Logger.getLogger("JenkinsPipelineLogger")
+
+                    // Log messages
+                    logger.info("INFO: Starting the pipeline execution.")
+                    logger.warning("WARNING: This is a warning message.")
+                    logger.severe("ERROR: This is an error message.")
+                }
+            }
+        }
+        stage('Perform Task') {
+            steps {
+                script {
+                    // Continue using the logger object
+                    def logger = Logger.getLogger("JenkinsPipelineLogger")
+                    logger.info("INFO: Executing some tasks in this stage...")
+                    echo "Task executed successfully."
+                }
+            }
+        }
+    }
+}
+
+
 cf apps | for /f "tokens=1" %A in ('findstr /r "^[A-Za-z]"') do @echo %A >> test.txt
 
 To add these parameters in a Jenkins job using the **"Add Parameters"** feature, you can follow these steps:
