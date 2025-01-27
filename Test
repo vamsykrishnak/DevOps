@@ -1,6 +1,56 @@
 pipeline {
     agent any
     stages {
+        stage('Build') {
+            steps {
+                script {
+                    // Shell command and update build description
+                    def result = sh(script: 'echo "Building version 1.0.0..."', returnStdout: true).trim()
+                    currentBuild.description = "Build stage: ${result}"
+                    echo "Build step executed."
+                }
+            }
+        }
+        stage('Test') {
+            steps {
+                script {
+                    // Shell command and update build description
+                    def result = sh(script: 'echo "Running tests..."', returnStdout: true).trim()
+                    currentBuild.description += "<br>Test stage: ${result}"
+                    echo "Test step executed."
+                }
+            }
+        }
+        stage('Deploy') {
+            steps {
+                script {
+                    // Shell command and update build description
+                    def result = sh(script: 'echo "Deploying to prod..."', returnStdout: true).trim()
+                    currentBuild.description += "<br>Deploy stage: ${result}"
+                    echo "Deploy step executed."
+                }
+            }
+        }
+    }
+    post {
+        success {
+            script {
+                currentBuild.description += "<br>Status: SUCCESS"
+            }
+        }
+        failure {
+            script {
+                currentBuild.description += "<br>Status: FAILURE"
+            }
+        }
+    }
+}
+
+
+
+pipeline {
+    agent any
+    stages {
         stage('Log with Echo') {
             steps {
                 script {
