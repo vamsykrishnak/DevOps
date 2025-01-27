@@ -1,6 +1,24 @@
 pipeline {
     agent any
     stages {
+        stage('Log with Echo') {
+            steps {
+                script {
+                    def stageName = "Build Stage"
+                    echo "[INFO] Starting ${stageName}"
+                    echo "[WARNING] A potential issue detected in ${stageName}"
+                    echo "[ERROR] A critical error occurred in ${stageName}"
+                }
+            }
+        }
+    }
+}
+
+
+
+pipeline {
+    agent any
+    stages {
         stage('Initialize Logger') {
             steps {
                 script {
