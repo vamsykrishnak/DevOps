@@ -1,5 +1,68 @@
 pipeline {
     agent any
+    environment {
+        // Assume these variables represent the result of the Nexus IQ scan
+        NEXUS_IQ_RESULT = "medium"  // Can be "low", "medium", "high", etc.
+    }
+    stages {
+        stage('Nexus IQ Scan') {
+            steps {
+                script {
+                    // Simulating Nexus IQ scan output
+                    echo "Running Nexus IQ scan..."
+                    // Set a result based on the simulated scan outcome (medium in this case)
+                    def scanResult = "${env.NEXUS_IQ_RESULT}"
+                    
+                    if (scanResult == "medium") {
+                        // Change stage color to yellow using currentBuild.result
+                        currentBuild.result = 'SUCCESS'  // Mark build as successful
+                        // Set a custom description to reflect the result
+                        currentBuild.description = "Medium Issues Found in Nexus IQ Scan"
+                        // Simulate echoing a warning message
+                        echo "Warning: Medium issues found in the Nexus IQ scan."
+                        // Change the stage color (yellow in this case)
+                        script {
+                            // Forcefully set the stage color to yellow using input or error actions
+                            currentBuild.displayName = "Scan Completed - Medium Issues"
+                        }
+                    } else {
+                        // If no issues or other types of issues, proceed normally
+                        echo "No medium issues found, proceeding."
+                    }
+                }
+            }
+        }
+        stage('Build') {
+            steps {
+                echo 'Building the project...'
+                // Simulate build process
+                sh 'echo "Build process complete."'
+            }
+        }
+    }
+    post {
+        success {
+            script {
+                echo "Pipeline completed successfully!"
+            }
+        }
+        failure {
+            script {
+                echo "Pipeline failed."
+            }
+        }
+    }
+}
+
+
+
+
+
+
+
+
+pipeline {
+    agent any
     stages {
         stage('Build') {
             steps {
