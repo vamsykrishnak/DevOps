@@ -1,6 +1,71 @@
 pipeline {
     agent any
     environment {
+        // Simulate Nexus IQ scan result
+        NEXUS_IQ_RESULT = "medium"  // Can be "low", "medium", "high", etc.
+    }
+    stages {
+        stage('Nexus IQ Scan') {
+            steps {
+                script {
+                    // Simulating Nexus IQ scan outcome (medium in this case)
+                    def scanResult = "${env.NEXUS_IQ_RESULT}"
+                    
+                    if (scanResult == "medium") {
+                        // Mark the build as SUCCESS (Green) but we will handle this condition
+                        currentBuild.result = 'SUCCESS'
+                        
+                        // Use `catchError` to allow the build to continue, but indicate the stage has issues
+                        catchError(buildResult: 'SUCCESS', stageResult: 'UNSTABLE') {
+                            // Mark the stage as having an issue, which will turn it yellow
+                            currentBuild.description = "Medium Issues Found in Nexus IQ Scan"
+                            echo "Warning: Medium issues found in Nexus IQ scan."
+                        }
+                    } else {
+                        // If there are no issues, simply continue
+                        echo "Nexus IQ scan passed with no issues."
+                    }
+                }
+            }
+        }
+
+        stage('Build') {
+            steps {
+                echo 'Building the project...'
+                // Simulate the build process
+                sh 'echo "Build process complete."'
+            }
+        }
+        
+        stage('Deploy') {
+            steps {
+                echo 'Deploying the project...'
+                // Simulate the deployment process
+                sh 'echo "Deployment complete."'
+            }
+        }
+    }
+
+    post {
+        success {
+            script {
+                // Ensure overall build remains green
+                currentBuild.result = 'SUCCESS'
+                echo "Pipeline completed successfully!"
+            }
+        }
+        failure {
+            script {
+                currentBuild.result = 'FAILURE'
+                echo "Pipeline execution failed."
+            }
+        }
+    }
+}
+
+pipeline {
+    agent any
+    environment {
         // Assume these variables represent the result of the Nexus IQ scan
         NEXUS_IQ_RESULT = "medium"  // Can be "low", "medium", "high", etc.
     }
