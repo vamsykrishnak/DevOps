@@ -1,3 +1,5 @@
+echo "\u001B[32mGreen: Success!\u001B[0m"
+
 pipeline {
     agent any
 
