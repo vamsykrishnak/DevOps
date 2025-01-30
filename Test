@@ -5,6 +5,21 @@ pipeline {
         stage('Example Stage') {
             steps {
                 script {
+                    // Set build description with HTML tags
+                    currentBuild.description = '<b>Build is unstable!</b> Check logs for details.'
+                }
+            }
+        }
+    }
+}
+
+pipeline {
+    agent any
+
+    stages {
+        stage('Example Stage') {
+            steps {
+                script {
                     catchError(buildResult: 'UNSTABLE', stageResult: 'UNSTABLE') {
                         // Your build logic here
                         echo 'Running some build steps...'
