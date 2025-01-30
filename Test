@@ -5,6 +5,25 @@ pipeline {
         stage('Example Stage') {
             steps {
                 script {
+                    // Set build description with colored text
+                    setBuildDescription("""
+                        <span style="color:green;">Green:</span> Success!<br>
+                        <span style="color:yellow;">Yellow:</span> Warning!<br>
+                        <span style="color:red;">Red:</span> Failure!
+                    """)
+                }
+            }
+        }
+    }
+}
+
+pipeline {
+    agent any
+
+    stages {
+        stage('Example Stage') {
+            steps {
+                script {
                     // Set build description with HTML tags
                     currentBuild.description = '<b>Build is unstable!</b> Check logs for details.'
                 }
