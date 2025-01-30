@@ -1,3 +1,40 @@
+ChatGPT
+
+You said:
+How to display sonar or nexus iq report url in Jenkins at build history besides build number
+
+2/2
+
+ChatGPT said:
+ChatGPT
+To display a SonarQube or Nexus IQ report URL in Jenkins' build history, alongside the build number, you can use build badges or build descriptions. Here’s how:
+
+1. Using Build Badges (Preferred)
+You can add a clickable badge linking to the SonarQube or Nexus IQ report.
+
+For SonarQube
+If you're using the SonarQube Scanner plugin, the report URL is usually stored in SONAR_HOST_URL and the project key. You can add a badge like this:
+
+Install the Badge Plugin in Jenkins.
+Add the following post-build script in "Execute Shell" or "Pipeline Script":
+SONAR_URL="${SONAR_HOST_URL}/dashboard?id=${SONAR_PROJECT_KEY}"
+echo "SONAR_URL=${SONAR_URL}" > sonar_url.txt
+Then, use the Badge Plugin to display the URL in the build history:
+
+def sonarUrl = readFile('sonar_url.txt').trim()
+manager.addShortText("🔍 Sonar Report", "grey", "white", "0px", "white", "black", sonarUrl)
+For Nexus IQ
+If using Nexus IQ, get the report URL dynamically or construct it manually based on your Nexus IQ server.
+Modify the script accordingly:
+IQ_REPORT_URL="https://nexus-iq-server/report/${BUILD_NUMBER}"
+echo "IQ_REPORT_URL=${IQ_REPORT_URL}" > iq_url.txt
+Then add the badge:
+
+def iqUrl = readFile('iq_url.txt').trim()
+manager.addShortText("📊 IQ Report", "grey", "white", "0px", "white", "black", iqUrl)
+
+
+
 pipeline {
     agent any
     environment {
