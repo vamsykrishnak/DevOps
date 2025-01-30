@@ -1,3 +1,25 @@
+pipeline {
+    agent any
+
+    stages {
+        stage('Example Stage') {
+            steps {
+                warnError('Stage is unstable due to an error') {
+                    script {
+                        // Your build logic here
+                        echo 'Running some build steps...'
+
+                        // Simulate a condition that causes an error
+                        if (someCondition) {
+                            error('Custom error message: Something went wrong!')
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
 ChatGPT
 
 You said:
