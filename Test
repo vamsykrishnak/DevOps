@@ -1,3 +1,5 @@
+echo "\033[1mERROR:\033[0m Something went wrong! Please check the logs."
+
 echo "\u001B[32mGreen: Success!\u001B[0m"
 
 pipeline {
