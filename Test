@@ -1,3 +1,19 @@
+node {
+    stage('Clean Workspace') {
+        deleteDir() // This clears the workspace
+    }
+    
+    stage('Checkout Code') {
+        // Example Git checkout
+        git url: 'https://github.com/your-repo.git', branch: 'main'
+    }
+    
+    stage('Build') {
+        sh 'mvn clean install'
+    }
+}
+
+
 echo "\033[1mERROR:\033[0m Something went wrong! Please check the logs."
 
 echo "\u001B[32mGreen: Success!\u001B[0m"
