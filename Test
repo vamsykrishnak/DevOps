@@ -1,3 +1,13 @@
+applications:
+  - name: your-app-name
+    memory: 1G
+    instances: 1
+    path: target/your-app.jar
+    env:
+      JAVA_OPTS: >
+        -Dspring.application.name=your-app-name
+        -Dspring.profiles.active=dev
+
 node {
     stage('Clean Workspace') {
         deleteDir() // This clears the workspace
