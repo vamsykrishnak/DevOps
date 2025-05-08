@@ -1,3 +1,6 @@
+env:
+  LOGGING_LEVEL_ORG_SPRINGFRAMEWORK_CLOUD_CONFIG_CLIENT: DEBUG
+
 applications:
   - name: your-app-name
     memory: 1G
