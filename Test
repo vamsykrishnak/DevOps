@@ -1,3 +1,54 @@
+pipeline {
+    agent any
+
+    environment {
+        CF_API = 'https://api.run.pivotal.io'          // or your PCF API endpoint
+        CF_ORG = 'your-org'
+        CF_SPACE = 'your-space'
+        CF_USERNAME = credentials('cf-username')       // Jenkins credentials ID
+        CF_PASSWORD = credentials('cf-password')       // Jenkins credentials ID
+        SERVICE_INSTANCE = 'my-config-server'          // Your Config Server service instance name
+        SERVICE_KEY = 'jenkins-service-key'            // Name for the new service key
+    }
+
+    stages {
+        stage('Login to PCF') {
+            steps {
+                sh '''
+                cf api $CF_API
+                cf auth $CF_USERNAME $CF_PASSWORD
+                cf target -o $CF_ORG -s $CF_SPACE
+                '''
+            }
+        }
+
+        stage('Create Service Key') {
+            steps {
+                sh '''
+                # Check if service key already exists
+                if cf service-key $SERVICE_INSTANCE $SERVICE_KEY; then
+                  echo "Service key already exists. Skipping creation."
+                else
+                  cf create-service-key $SERVICE_INSTANCE $SERVICE_KEY
+                fi
+                '''
+            }
+        }
+
+        stage('Retrieve Service Key') {
+            steps {
+                sh '''
+                echo "Retrieving service key credentials..."
+                cf service-key $SERVICE_INSTANCE $SERVICE_KEY > service-key.json
+                cat service-key.json
+                '''
+                // Optionally parse with jq or store for further steps
+            }
+        }
+    }
+}
+
+
 env:
   LOGGING_LEVEL_ORG_SPRINGFRAMEWORK_CLOUD_CONFIG_CLIENT: DEBUG
   LOGGING_LEVEL_ORG_SPRINGFRAMEWORK_WEB_CLIENT: DEBUG
