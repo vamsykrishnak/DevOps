@@ -1,3 +1,5 @@
+sed -i "s|{{PRIVATE_KEY}}|$(tr -d '\n' < ~/.ssh/id_rsa)|g" file.json
+
 pipeline {
     agent any
 
