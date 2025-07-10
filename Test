@@ -1,3 +1,6 @@
+SAFE_KEY=$(printf '%s' "$ESCAPED_KEY" | sed -e 's/[\\/&]/\\&/g')
+sed "s|{{SSH_KEY}}|$SAFE_KEY|g" template.json > final.json
+
 sed -i "s|{{PRIVATE_KEY}}|$(tr -d '\n' < ~/.ssh/id_rsa)|g" file.json
 
 pipeline {
