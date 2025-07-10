@@ -1,3 +1,12 @@
+# Jenkins passes SSH_KEY as env var with multiline private key
+# Convert to single line:
+ESCAPED_KEY=$(printf "%s\\n" "$SSH_KEY")
+
+# Replace in file
+sed "s|{{SSH_KEY}}|$ESCAPED_KEY|g" template.json > final.json
+
+
+
 SAFE_KEY=$(printf '%s' "$ESCAPED_KEY" | sed -e 's/[\\/&]/\\&/g')
 sed "s|{{SSH_KEY}}|$SAFE_KEY|g" template.json > final.json
 
