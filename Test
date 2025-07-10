@@ -1,3 +1,6 @@
+jq '.git.privateKey |= split("\n") | .git.privateKey |= join("\\n")' config.json > updated_config.json
+
+
 # Jenkins passes SSH_KEY as env var with multiline private key
 # Convert to single line:
 ESCAPED_KEY=$(printf "%s\\n" "$SSH_KEY")
