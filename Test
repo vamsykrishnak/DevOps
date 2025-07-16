@@ -1,3 +1,89 @@
+node {
+    // Configuration
+    def akamaiBin = "./akamai-purge-1.0.1-linuxamd64-edgerc"
+    def edgercPath = "${env.HOME}/.edgerc"
+    def section = "default"
+    def urlToCheck = "https://your-domain.com/path/to/file.js"
+    def purgeId = ""
+    def cacheHeaderBefore = ""
+    def cacheHeaderAfter = ""
+
+    stage('Check Cache Before Purge') {
+        echo "Checking Akamai cache BEFORE purge for URL: ${urlToCheck}"
+        cacheHeaderBefore = sh(
+            script: "curl -s -I -H 'Pragma: akamai-x-cache-on' '${urlToCheck}' | grep -i 'X-Cache' || echo 'X-Cache header not found'",
+            returnStdout: true
+        ).trim()
+        echo "X-Cache before purge: ${cacheHeaderBefore}"
+    }
+
+    stage('Send Akamai Purge Request') {
+        echo "Sending Akamai purge request for: ${urlToCheck}"
+        def purgeResponse = sh(
+            script: "${akamaiBin} --edgerc ${edgercPath} --section ${section} invalidate --url '${urlToCheck}'",
+            returnStdout: true
+        ).trim()
+        echo purgeResponse
+
+        // Extract Purge ID using regex
+        def matcher = purgeResponse =~ /(eicp-[A-Za-z0-9]+)/
+
+        if (matcher) {
+            purgeId = matcher[0]
+            echo "Extracted Purge ID: ${purgeId}"
+        } else {
+            error "❌ Failed to extract Purge ID from response"
+        }
+    }
+
+    stage('Wait for Purge Completion') {
+        echo "Polling purge status for Purge ID: ${purgeId}"
+        def maxAttempts = 12
+        def intervalSeconds = 5
+        def statusComplete = false
+
+        for (int i = 0; i < maxAttempts; i++) {
+            def statusOutput = sh(
+                script: "${akamaiBin} --edgerc ${edgercPath} --section ${section} status --purgeId ${purgeId}",
+                returnStdout: true
+            ).trim()
+            echo "Purge Status Check #${i + 1}: ${statusOutput}"
+
+            if (statusOutput.contains("Completed")) {
+                statusComplete = true
+                break
+            }
+            sleep(intervalSeconds)
+        }
+
+        if (!statusComplete) {
+            error "❌ Purge did not complete in expected time"
+        }
+    }
+
+    stage('Check Cache After Purge') {
+        echo "Checking Akamai cache AFTER purge..."
+        cacheHeaderAfter = sh(
+            script: "curl -s -I -H 'Pragma: akamai-x-cache-on' '${urlToCheck}' | grep -i 'X-Cache' || echo 'X-Cache header not found'",
+            returnStdout: true
+        ).trim()
+        echo "X-Cache after purge: ${cacheHeaderAfter}"
+
+        if (cacheHeaderAfter.contains("TCP_MISS")) {
+            echo "✅ Purge effective: Akamai cache miss confirmed"
+        } else {
+            error "❌ Purge may not be effective: X-Cache is not a MISS"
+        }
+    }
+}
+
+
+
+
+
+
+
+
 pipeline {
     agent any
 
