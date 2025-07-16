@@ -1,3 +1,7 @@
+curl -s -I -H "Pragma: akamai-x-cache-on, akamai-x-get-cache-key" "https://your-domain.com/path"
+
+
+
 node {
     // Configuration
     def akamaiBin = "./akamai-purge-1.0.1-linuxamd64-edgerc"
