@@ -1,3 +1,93 @@
+pipeline {
+    agent any
+
+    environment {
+        AKAMAI_BIN = "./akamai-purge-1.0.1-linuxamd64-edgerc"
+        EDGERC_PATH = "${HOME}/.edgerc"
+        SECTION = "default"
+        URL_TO_CHECK = "https://your-domain.com/path/to/file.js"
+    }
+
+    stages {
+        stage('Check Cache Before Purge') {
+            steps {
+                script {
+                    echo "Checking cache status BEFORE purge..."
+                    sh """
+                        echo "HEAD request to \$URL_TO_CHECK"
+                        curl -s -I -H "Pragma: akamai-x-cache-on" \$URL_TO_CHECK | grep -i 'X-Cache' || echo 'No X-Cache header found'
+                    """
+                }
+            }
+        }
+
+        stage('Send Purge Request') {
+            steps {
+                script {
+                    echo "Sending purge request..."
+                    def purgeResponse = sh(
+                        script: "\$AKAMAI_BIN --edgerc \$EDGERC_PATH --section \$SECTION invalidate --url \$URL_TO_CHECK",
+                        returnStdout: true
+                    ).trim()
+                    echo purgeResponse
+
+                    // Extract Purge ID
+                    def matcher = (purgeResponse =~ /eicp-[A-Za-z0-9]+/)
+                    if (matcher) {
+                        env.PURGE_ID = matcher[0]
+                        echo "Purge ID: ${env.PURGE_ID}"
+                    } else {
+                        error "Failed to extract Purge ID"
+                    }
+                }
+            }
+        }
+
+        stage('Wait for Purge Completion') {
+            steps {
+                script {
+                    echo "Waiting for purge completion..."
+                    def status = ""
+                    timeout(time: 2, unit: 'MINUTES') {
+                        waitUntil {
+                            status = sh(
+                                script: "\$AKAMAI_BIN --edgerc \$EDGERC_PATH --section \$SECTION status --purgeId \$PURGE_ID",
+                                returnStdout: true
+                            ).trim()
+                            echo status
+                            return status.contains("Completed")
+                        }
+                    }
+                }
+            }
+        }
+
+        stage('Check Cache After Purge') {
+            steps {
+                script {
+                    echo "Checking cache status AFTER purge..."
+                    def result = sh(
+                        script: "curl -s -I -H 'Pragma: akamai-x-cache-on' \$URL_TO_CHECK | grep -i 'X-Cache'",
+                        returnStdout: true
+                    ).trim()
+                    echo result
+
+                    if (result.contains("TCP_MISS")) {
+                        echo "✅ Purge effective: Cache MISS confirmed."
+                    } else {
+                        error "❌ Purge may not be effective. Cache HIT or unknown status."
+                    }
+                }
+            }
+        }
+    }
+}
+
+
+
+
+
+
 jq '.git.privateKey |= split("\n") | .git.privateKey |= join("\\n")' config.json > updated_config.json
 
 
