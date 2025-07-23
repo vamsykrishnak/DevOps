@@ -1,3 +1,21 @@
+
+plugins {
+    id "com.github.node-gradle.node" version "7.1.0"
+}
+
+node {
+    version = "20.9.0"           // Replace with your desired Node.js version
+    npmVersion = "10.2.0"        // Optional: NPM version if needed
+    download = true              // Ensures Gradle downloads and uses a local Node.js
+}
+pluginManagement {
+    repositories {
+        gradlePluginPortal()
+    }
+}
+
+
+
 curl -s -I -H "Pragma: akamai-x-cache-on, akamai-x-get-cache-key" "https://your-domain.com/path"
 
 
